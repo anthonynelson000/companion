@@ -125,7 +125,7 @@ function setState(state) {
   statusEl.textContent = labels[state] || '';
   const btn = document.getElementById('micBtn');
   if (btn) {
-    const hide = (state === 'thinking' || state === 'speaking' || state === 'listening');
+    const hide = (state === 'thinking' || state === 'speaking');
     btn.style.visibility = hide ? 'hidden' : 'visible';
     btn.disabled = hide;
   }
