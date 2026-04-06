@@ -134,17 +134,14 @@ function showError(msg) {
 }
 
 // ── Audio unlock ─────────────────────────────────────────────────
-// Browsers block audio not triggered inside a user gesture.
-// We pre-create one Audio element and reuse it for all playback.
-const sharedAudio = new Audio();
+// One silent play inside the user gesture unlocks the audio session.
+// After that, new Audio() elements work fine at full volume.
 let audioUnlocked = false;
-
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
-  // Play a silent WAV to unlock the audio pipeline inside the gesture
-  sharedAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-  sharedAudio.play().catch(() => {});
+  const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+  a.play().catch(() => {});
   log('audio unlocked');
 }
 
@@ -249,8 +246,9 @@ function speak(audioB64) {
   const binary = atob(audioB64);
   const bytes  = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const blob = new Blob([bytes], { type: 'audio/mpeg' });
-  const url  = URL.createObjectURL(blob);
+  const blob  = new Blob([bytes], { type: 'audio/mpeg' });
+  const url   = URL.createObjectURL(blob);
+  const audio = new Audio(url);
 
   const done = () => {
     URL.revokeObjectURL(url);
@@ -259,11 +257,9 @@ function speak(audioB64) {
     log('audio ended — mic re-enabled');
   };
 
-  document.getElementById('micBtn').disabled = true;
-  sharedAudio.onended = done;
-  sharedAudio.onerror = (err) => { log(`audio error: ${err.type}`); done(); };
-  sharedAudio.src = url;
-  sharedAudio.play()
+  audio.onended = done;
+  audio.onerror = (err) => { log(`audio error: ${err.type}`); done(); };
+  audio.play()
     .then(() => log('audio playing'))
     .catch(err => { log(`audio play failed: ${err}`); done(); });
 }
