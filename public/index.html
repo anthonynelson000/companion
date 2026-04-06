@@ -164,6 +164,7 @@ function setSpeaking(val) {
 function startListening() {
   log(`startListening — appReady:${appReady} speaking:${isSpeaking} micActive:${micActive}`);
   if (!appReady || isSpeaking || micActive) { log(`BLOCKED — speaking:${isSpeaking} micActive:${micActive}`); return; }
+  setState('listening');
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showError('Используйте Safari для голосового ввода.'); log('NO SR API'); return; }
