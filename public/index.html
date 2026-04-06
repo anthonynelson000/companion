@@ -128,11 +128,20 @@ function onMicTap() {
 }
 
 // ── Speech recognition ───────────────────────────────────────────
+let activeRec = null;
+
 function startListening() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showError('Используйте Safari для голосового ввода.'); showMic(); return; }
 
+  // Kill any previous session before starting a new one
+  if (activeRec) {
+    try { activeRec.abort(); } catch(e) {}
+    activeRec = null;
+  }
+
   const rec = new SR();
+  activeRec = rec;
   rec.lang           = 'ru-RU';
   rec.continuous     = false;
   rec.interimResults = false;
@@ -145,7 +154,7 @@ function startListening() {
     silenceTimer = setTimeout(() => {
       log('silence timeout — forcing stop');
       try { rec.stop(); } catch(e) {}
-    }, 3000);
+    }, 8000);
   };
 
   rec.onresult = (e) => {
