@@ -137,7 +137,16 @@ function startListening() {
   rec.continuous     = false;
   rec.interimResults = false;
 
-  rec.onstart = () => { setStatus('listening'); log('listening…'); };
+  let silenceTimer = null;
+  rec.onstart = () => {
+    setStatus('listening');
+    log('listening…');
+    // Force-stop after 8 seconds if nothing heard — iOS sometimes misses silence
+    silenceTimer = setTimeout(() => {
+      log('silence timeout — stopping rec');
+      try { rec.stop(); } catch(e) {}
+    }, 8000);
+  };
 
   rec.onresult = (e) => {
     const text = Array.from(e.results)
@@ -166,9 +175,8 @@ function startListening() {
   };
 
   rec.onend = () => {
+    clearTimeout(silenceTimer);
     log('rec ended');
-    // onend fires after onresult — only show mic if we're still idle
-    // (if sendToAI was called, state is 'thinking' and we don't show mic)
     if (document.body.className === 'idle') showMic();
   };
 
