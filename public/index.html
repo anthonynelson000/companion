@@ -253,8 +253,10 @@ function speak(audioB64) {
   const done = () => {
     URL.revokeObjectURL(url);
     setSpeaking(false);
+    micActive = false;
+    try { recognition && recognition.abort(); } catch(e) {}
     log('audio ended — auto-starting mic');
-    setTimeout(() => startListening(), 300);
+    setTimeout(() => startListening(), 400);
   };
 
   audio.onended = done;
