@@ -144,7 +144,7 @@ function getMusicQuery(text) {
   if (t.includes('пушкин') || t.includes('pushkin')) return 'Pushkin poems Russian';
   if (t.includes('джаз') || t.includes('jazz')) return 'Russian jazz music';
   if (t.includes('опера') || t.includes('opera')) return 'Russian opera Bolshoi';
-  return 'Russian music';
+  return 'Russian classical music opera Tchaikovsky Rachmaninoff';
 }
 
 app.post('/chat', async (req, res) => {
