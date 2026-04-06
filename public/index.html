@@ -123,6 +123,8 @@ function setState(state) {
     speaking:  'говорю…'
   };
   statusEl.textContent = labels[state] || '';
+  const btn = document.getElementById('micBtn');
+  if (btn) btn.disabled = (state === 'thinking' || state === 'speaking');
 }
 
 function showError(msg) {
@@ -160,7 +162,15 @@ function setSpeaking(val) {
 // ── Single-shot mic — built fresh each time, started by user tap ──
 function startListening() {
   log(`startListening — appReady:${appReady} speaking:${isSpeaking} micActive:${micActive}`);
-  if (!appReady || isSpeaking || micActive) { log('BLOCKED'); return; }
+  if (!appReady || isSpeaking) { log('BLOCKED — speaking'); return; }
+  if (micActive) {
+    // Already listening — abort and restart fresh
+    log('mic already active, restarting');
+    try { recognition && recognition.abort(); } catch(e) {}
+    micActive = false;
+    setTimeout(startListening, 300);
+    return;
+  }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showError('Используйте Safari для голосового ввода.'); log('NO SR API'); return; }
@@ -189,11 +199,12 @@ function startListening() {
     micActive = false;
     log(`mic error: ${e.error}`);
     if (e.error === 'not-allowed') { showError('Разрешите доступ к микрофону в настройках Safari.'); return; }
-    if (e.error === 'no-speech')   { setState('idle'); return; }
+    // audio-capture = iOS mic conflict; reset and allow retry
     setState('idle');
+    document.getElementById('micBtn').disabled = false;
   };
 
-  try { recognition.start(); log('recognition.start() called'); } catch(e) { log(`start exception: ${e}`); setState('idle'); }
+  try { recognition.start(); log('recognition.start() called'); } catch(e) { log(`start exception: ${e}`); micActive = false; setState('idle'); }
 }
 
 function stopMic() {
@@ -203,6 +214,7 @@ function stopMic() {
 
 // ── AI call ──────────────────────────────────────────────────────
 async function sendToAI(userText) {
+  micActive = false;  // mic hardware is done, only server call in flight now
   stopMic();
   setState('thinking');
   log(`sending to AI: "${userText}"`);
@@ -244,7 +256,6 @@ function speak(audioB64) {
     URL.revokeObjectURL(url);
     setSpeaking(false);
     setState('idle');
-    document.getElementById('micBtn').disabled = false;
     log('audio ended — mic re-enabled');
   };
 
