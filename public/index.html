@@ -52,11 +52,11 @@
   .error-banner { display: none; position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
     background: rgba(180,60,60,0.85); color: #fff; padding: 14px 28px; border-radius: 10px;
     font-size: 1.1rem; text-align: center; max-width: 320px; }
-  .mic-btn { margin-top: 40px; width: 80px; height: 80px; border-radius: 50%;
+  .mic-btn { margin-top: 40px; width: 120px; height: 120px; border-radius: 50%;
     border: 2px solid rgba(201,169,110,0.5); background: rgba(201,169,110,0.06);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
     transition: border-color 0.3s, background 0.3s; -webkit-tap-highlight-color: transparent; }
-  .mic-icon { width: 32px; height: 32px; }
+  .mic-icon { width: 48px; height: 48px; }
   .mic-icon path { fill: rgba(201,169,110,0.7); }
 </style>
 </head>
@@ -78,7 +78,7 @@
   </svg>
 </button>
 <div class="error-banner" id="errorBanner"></div>
-<div id="debug" style="position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;max-height:160px;overflow-y:auto;z-index:999;"></div>
+<div id="debug" style="display:none;"></div>
 
 <script>
 const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
