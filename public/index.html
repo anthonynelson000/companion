@@ -145,7 +145,7 @@ function startListening() {
     silenceTimer = setTimeout(() => {
       log('silence timeout — forcing stop');
       try { rec.stop(); } catch(e) {}
-    }, 8000);
+    }, 3000);
   };
 
   rec.onresult = (e) => {
