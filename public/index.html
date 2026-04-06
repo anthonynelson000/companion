@@ -124,7 +124,11 @@ function setState(state) {
   };
   statusEl.textContent = labels[state] || '';
   const btn = document.getElementById('micBtn');
-  if (btn) btn.disabled = (state === 'thinking' || state === 'speaking');
+  if (btn) {
+    const hide = (state === 'thinking' || state === 'speaking' || state === 'listening');
+    btn.style.visibility = hide ? 'hidden' : 'visible';
+    btn.disabled = hide;
+  }
 }
 
 function showError(msg) {
@@ -242,12 +246,16 @@ function speak(audioB64) {
   const url   = URL.createObjectURL(blob);
   const audio = new Audio(url);
 
+  let doneCalled = false;
   const done = () => {
+    if (doneCalled) return;
+    doneCalled = true;
     URL.revokeObjectURL(url);
     setSpeaking(false);
     micActive = false;
     try { recognition && recognition.abort(); } catch(e) {}
     log('audio ended — auto-starting mic');
+    showMicBtn(true);
     setTimeout(() => startListening(), 400);
   };
 
