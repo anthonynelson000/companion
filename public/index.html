@@ -254,8 +254,8 @@ function speak(audioB64) {
     setSpeaking(false);
     micActive = false;
     try { recognition && recognition.abort(); } catch(e) {}
-    log('audio ended — auto-starting mic');
-    showMicBtn(true);
+    log('audio ended — showing mic, auto-starting');
+    setState('idle');
     setTimeout(() => startListening(), 400);
   };
 
