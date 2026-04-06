@@ -125,7 +125,7 @@ function setState(state) {
   statusEl.textContent = labels[state] || '';
   const btn = document.getElementById('micBtn');
   if (btn) {
-    const hide = (state === 'thinking' || state === 'speaking');
+    const hide = (state === 'thinking' || state === 'speaking' || state === 'listening');
     btn.style.visibility = hide ? 'hidden' : 'visible';
     btn.disabled = hide;
   }
@@ -141,11 +141,13 @@ function showError(msg) {
 // One silent play inside the user gesture unlocks the audio session.
 // After that, new Audio() elements work fine at full volume.
 let audioUnlocked = false;
+let primedAudio = null;
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
-  const a = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-  a.play().catch(() => {});
+  // Create and play silent audio within the gesture to unlock iOS audio session
+  primedAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+  primedAudio.play().catch(() => {});
   log('audio unlocked');
 }
 
@@ -245,7 +247,10 @@ function speak(audioB64) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const blob  = new Blob([bytes], { type: 'audio/mpeg' });
   const url   = URL.createObjectURL(blob);
-  const audio = new Audio(url);
+  // Reuse the primed audio element if available (iOS requires gesture-linked element)
+  const audio = primedAudio || new Audio();
+  primedAudio = null;
+  audio.src = url;
 
   let doneCalled = false;
   const done = () => {
