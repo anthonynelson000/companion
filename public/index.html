@@ -124,7 +124,7 @@ function unlockAudio() {
 function onMicTap() {
   log('mic tapped');
   hideMic();
-  startListening();
+  setTimeout(startListening, 300);
 }
 
 // ── Speech recognition ───────────────────────────────────────────
@@ -170,7 +170,12 @@ function startListening() {
     if (e.error === 'not-allowed') {
       showError('Разрешите доступ к микрофону в настройках Safari.');
     }
-    // Always show mic on any error so Faina can try again
+    // For audio-capture/aborted, retry once after a short delay
+    if (e.error === 'audio-capture' || e.error === 'aborted') {
+      log('mic busy — retrying in 600ms');
+      setTimeout(() => { setStatus('idle'); showMic(); }, 600);
+      return;
+    }
     setStatus('idle');
     showMic();
   };
