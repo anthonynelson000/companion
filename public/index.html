@@ -141,11 +141,12 @@ function showError(msg) {
 // One silent play inside the user gesture unlocks the audio session.
 // After that, new Audio() elements work fine at full volume.
 let audioUnlocked = false;
-const sharedAudio = new Audio();
+let sharedAudio = null;
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
-  // Play silent audio on the shared element within the gesture to unlock iOS
+  // Create element INSIDE the gesture handler so iOS trusts it
+  sharedAudio = new Audio();
   sharedAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
   sharedAudio.play().catch(() => {});
   log('audio unlocked');
