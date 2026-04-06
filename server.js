@@ -220,6 +220,22 @@ app.post('/clear', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/translate', async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.json({ translation: '' });
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: `Translate this Russian text to English. Reply with only the translation, nothing else:\n\n${text}` }]
+    });
+    const translation = response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    res.json({ translation });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/history', async (req, res) => {
   const rows = pgPool
     ? (await pgPool.query('SELECT role, content, timestamp FROM messages ORDER BY id ASC')).rows
@@ -236,14 +252,20 @@ app.get('/history', async (req, res) => {
   h1 { color: #c9a96e; font-weight: 300; letter-spacing: 0.1em; font-size: 1.4rem; margin-bottom: 8px; }
   .count { color: #6b6658; font-size: 0.85rem; margin-bottom: 32px; }
   .msg { margin-bottom: 18px; }
-  .bubble { display: inline-block; padding: 10px 16px; border-radius: 12px; max-width: 90%; line-height: 1.55; font-size: 0.95rem; }
+  .bubble { display: inline-block; padding: 10px 16px; border-radius: 12px; max-width: 90%; line-height: 1.55; font-size: 0.95rem; cursor: pointer; position: relative; }
+  .bubble:hover { opacity: 0.85; }
   .user .bubble { background: #1e2030; color: #c8d0e0; border-radius: 12px 12px 12px 2px; }
   .assistant .bubble { background: #1c1a14; color: #e8e0d0; border: 1px solid rgba(201,169,110,0.2); border-radius: 12px 12px 2px 12px; }
   .user { text-align: left; }
   .assistant { text-align: right; }
   .label { font-size: 0.72rem; color: #6b6658; margin-bottom: 4px; letter-spacing: 0.05em; }
   .ts { font-size: 0.7rem; color: #3a3830; margin-top: 3px; }
+  .translation { font-size: 0.82rem; color: #6b6658; font-style: italic; margin-top: 5px; padding: 0 4px; display: none; }
+  .user .translation { text-align: left; }
+  .assistant .translation { text-align: right; }
+  .translation.visible { display: block; }
   .day-sep { text-align: center; color: #3a3830; font-size: 0.78rem; margin: 28px 0 18px; letter-spacing: 0.08em; }
+  .hint { color: #3a3830; font-size: 0.75rem; margin-bottom: 24px; font-style: italic; }
   .clear-btn { display: block; margin: 40px auto 0; padding: 10px 28px; background: transparent; border: 1px solid rgba(180,60,60,0.4); color: rgba(220,100,100,0.7); border-radius: 6px; cursor: pointer; font-family: Georgia, serif; font-size: 0.85rem; letter-spacing: 0.05em; }
   .clear-btn:hover { border-color: rgba(220,100,100,0.7); color: #e06060; }
 </style>
@@ -251,9 +273,11 @@ app.get('/history', async (req, res) => {
 <body>
 <h1>История разговоров</h1>
 <div class="count">${rows.length} сообщений</div>
+<div class="hint">tap any message to translate</div>
 ${(() => {
   let out = '';
   let lastDay = '';
+  let idx = 0;
   for (const r of rows) {
     const ts = r.timestamp ? new Date(r.timestamp) : null;
     const day = ts ? ts.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
@@ -263,15 +287,33 @@ ${(() => {
     }
     const time = ts ? ts.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
     const who = r.role === 'user' ? 'Фаина' : 'Наташа';
+    const escaped = r.content.replace(/</g,'&lt;').replace(/\[MUSIC:[^\]]*\]/g,'🎵').replace(/'/g, '&#39;');
     out += `<div class="msg ${r.role}">
       <div class="label">${who}</div>
-      <div class="bubble">${r.content.replace(/</g,'&lt;').replace(/\[MUSIC:[^\]]*\]/g,'🎵')}</div>
+      <div class="bubble" onclick="translate(this, '${escaped}')" id="b${idx}">${escaped}</div>
+      <div class="translation" id="t${idx}"></div>
       ${time ? `<div class="ts">${time}</div>` : ''}
     </div>`;
+    idx++;
   }
   return out;
 })()}
 <button class="clear-btn" onclick="if(confirm('Очистить всю историю?')){fetch('/clear',{method:'POST'}).then(()=>location.reload())}">Очистить историю</button>
+<script>
+async function translate(bubble, text) {
+  const idx = bubble.id.replace('b','');
+  const tDiv = document.getElementById('t' + idx);
+  if (tDiv.classList.contains('visible')) { tDiv.classList.remove('visible'); return; }
+  if (tDiv.textContent) { tDiv.classList.add('visible'); return; }
+  tDiv.textContent = '…';
+  tDiv.classList.add('visible');
+  try {
+    const res = await fetch('/translate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+    const data = await res.json();
+    tDiv.textContent = data.translation || '(no translation)';
+  } catch { tDiv.textContent = '(error)'; }
+}
+</script>
 </body></html>`;
   res.send(html);
 });
