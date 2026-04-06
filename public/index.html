@@ -141,13 +141,13 @@ function showError(msg) {
 // One silent play inside the user gesture unlocks the audio session.
 // After that, new Audio() elements work fine at full volume.
 let audioUnlocked = false;
-let primedAudio = null;
+const sharedAudio = new Audio();
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
-  // Create and play silent audio within the gesture to unlock iOS audio session
-  primedAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
-  primedAudio.play().catch(() => {});
+  // Play silent audio on the shared element within the gesture to unlock iOS
+  sharedAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+  sharedAudio.play().catch(() => {});
   log('audio unlocked');
 }
 
@@ -247,9 +247,8 @@ function speak(audioB64) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   const blob  = new Blob([bytes], { type: 'audio/mpeg' });
   const url   = URL.createObjectURL(blob);
-  // Reuse the primed audio element if available (iOS requires gesture-linked element)
-  const audio = primedAudio || new Audio();
-  primedAudio = null;
+  // Always use the single shared audio element (keeps iOS gesture context)
+  const audio = sharedAudio;
   audio.src = url;
 
   let doneCalled = false;
