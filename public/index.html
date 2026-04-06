@@ -178,7 +178,7 @@ function startListening() {
   recognition.interimResults = false;
 
   recognition.onstart  = () => { micActive = true; setState('listening'); showBtn(false); log('mic started'); };
-  recognition.onend    = () => { micActive = false; setState('idle'); showBtn(true); log('mic ended'); };
+  recognition.onend    = () => { micActive = false; setState('idle'); if (!isSpeaking) showBtn(true); log('mic ended'); };
 
   recognition.onresult = (e) => {
     micActive = false;
