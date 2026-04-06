@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Собеседник">
+<meta name="theme-color" content="#0e0f14">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Собеседник</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0e0f14; --surface: #161820; --gold: #c9a96e;
+    --gold-dim: #7a6340; --blue: #6ab4e8; --text: #e8e0d0; --muted: #6b6658;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif; overflow: hidden; user-select: none; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, #1a1c2e 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 100%, #0c0e1a 0%, transparent 60%), var(--bg); }
+  .avatar-wrap { position: relative; width: 260px; height: 260px; display: flex; align-items: center; justify-content: center; }
+  .ring-outer { position: absolute; width: 240px; height: 240px; border-radius: 50%;
+    border: 1px solid rgba(201,169,110,0.15); animation: spin-slow 18s linear infinite; }
+  .ring-outer::before { content: ''; position: absolute; top: -3px; left: 50%;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--gold-dim); transform: translateX(-50%); }
+  .ring-mid { position: absolute; width: 200px; height: 200px; border-radius: 50%;
+    border: 1px solid rgba(201,169,110,0.25); transition: border-color 0.4s, transform 0.4s; }
+  .orb { position: relative; width: 150px; height: 150px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 35%, #2a2d42 0%, #181a28 50%, #0e0f18 100%);
+    box-shadow: 0 0 40px rgba(106,180,232,0.08), 0 0 80px rgba(201,169,110,0.06), inset 0 1px 1px rgba(255,255,255,0.06);
+    transition: box-shadow 0.3s; display: flex; align-items: center; justify-content: center; }
+  .face { position: relative; width: 80px; height: 80px; }
+  .eye { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); opacity: 0.85; transition: transform 0.3s, opacity 0.3s; }
+  .eye.left { top: 28px; left: 18px; } .eye.right { top: 28px; right: 18px; }
+  .mouth { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+    width: 26px; height: 3px; border-radius: 2px; background: var(--gold); opacity: 0.6;
+    transition: height 0.2s, width 0.2s, border-radius 0.2s, opacity 0.3s; }
+  body.listening .ring-mid { border-color: rgba(106,180,232,0.5); animation: pulse-listen 1.4s ease-in-out infinite; }
+  body.listening .orb { box-shadow: 0 0 60px rgba(106,180,232,0.18), 0 0 100px rgba(106,180,232,0.08), inset 0 1px 1px rgba(255,255,255,0.06); }
+  body.listening .eye { background: var(--blue); opacity: 1; }
+  body.thinking .ring-mid { border-color: rgba(201,169,110,0.4); animation: pulse-think 0.8s ease-in-out infinite; }
+  body.thinking .orb { box-shadow: 0 0 60px rgba(201,169,110,0.14), 0 0 100px rgba(201,169,110,0.07), inset 0 1px 1px rgba(255,255,255,0.06); }
+  body.thinking .eye { opacity: 0.4; transform: scaleY(0.4); }
+  body.thinking .mouth { opacity: 0.3; }
+  body.speaking .ring-mid { border-color: rgba(201,169,110,0.6); animation: pulse-speak 0.5s ease-in-out infinite alternate; }
+  body.speaking .orb { box-shadow: 0 0 70px rgba(201,169,110,0.22), 0 0 120px rgba(201,169,110,0.1), inset 0 1px 1px rgba(255,255,255,0.08); }
+  body.speaking .mouth { opacity: 0.85; animation: mouth-move 0.35s ease-in-out infinite alternate; }
+  @keyframes spin-slow { to { transform: rotate(360deg); } }
+  @keyframes pulse-listen { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.04); opacity: 0.7; } }
+  @keyframes pulse-think { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.02) rotate(2deg); } }
+  @keyframes pulse-speak { from { transform: scale(1); } to { transform: scale(1.06); } }
+  @keyframes mouth-move { from { height: 3px; width: 26px; border-radius: 2px; } to { height: 9px; width: 22px; border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%; } }
+  .status { margin-top: 36px; font-size: 1.05rem; font-weight: 300; font-style: italic;
+    color: var(--muted); letter-spacing: 0.04em; height: 1.4em; text-align: center; transition: color 0.4s; }
+  body.listening .status { color: var(--blue); }
+  body.thinking  .status { color: var(--gold-dim); }
+  body.speaking  .status { color: var(--gold); }
+  .name { position: absolute; top: 32px; font-size: 1.6rem; font-weight: 300;
+    letter-spacing: 0.18em; color: rgba(201,169,110,0.5); text-transform: uppercase; }
+  .error-banner { display: none; position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    background: rgba(180,60,60,0.85); color: #fff; padding: 10px 24px; border-radius: 8px;
+    font-size: 0.9rem; text-align: center; max-width: 340px; }
+  .wave { display: flex; align-items: center; gap: 3px; height: 24px; margin-top: 14px; opacity: 0; transition: opacity 0.3s; }
+  body.listening .wave, body.speaking .wave { opacity: 1; }
+  .wave span { display: block; width: 3px; border-radius: 2px; background: var(--blue); height: 4px; }
+  body.listening .wave span { animation: wave-bar 1s ease-in-out infinite; }
+  body.speaking  .wave span { animation: wave-bar 0.45s ease-in-out infinite; background: var(--gold); }
+  .wave span:nth-child(1){animation-delay:0s} .wave span:nth-child(2){animation-delay:0.1s}
+  .wave span:nth-child(3){animation-delay:0.2s} .wave span:nth-child(4){animation-delay:0.3s}
+  .wave span:nth-child(5){animation-delay:0.2s} .wave span:nth-child(6){animation-delay:0.1s}
+  .wave span:nth-child(7){animation-delay:0s}
+  @keyframes wave-bar { 0%, 100% { height: 4px; } 50% { height: 20px; } }
+</style>
+</head>
+<body class="idle">
+<div class="name">Собеседник</div>
+<div class="avatar-wrap">
+  <div class="ring-outer"></div>
+  <div class="ring-mid"></div>
+  <div class="orb">
+    <div class="face">
+      <div class="eye left"></div>
+      <div class="eye right"></div>
+      <div class="mouth"></div>
+    </div>
+  </div>
+</div>
+<div class="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+<div class="status" id="status">слушаю…</div>
+<div class="error-banner" id="error"></div>
+
+
+<script>
+const SERVER = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+  ? 'http://localhost:3000' : '';
+
+const statusEl = document.getElementById('status');
+const errorEl  = document.getElementById('error');
+
+// ── State ────────────────────────────────────────────────────────
+let isSpeaking   = false;
+let silenceTimer = null;
+let transcript   = '';
+let recognition  = null;
+let micActive    = false;
+
+function setState(state) {
+  document.body.className = state;
+  const labels = { idle: '', listening: 'слушаю…', thinking: 'думаю…', speaking: 'говорю…' };
+  statusEl.textContent = labels[state] || '';
+}
+
+function showError(msg) {
+  errorEl.style.display = 'block';
+  errorEl.textContent = msg;
+  setTimeout(() => errorEl.style.display = 'none', 5000);
+}
+
+// ── Mic ──────────────────────────────────────────────────────────
+function startMic() {
+  if (micActive || isSpeaking) return;
+  try { recognition.start(); } catch(e) {}
+}
+
+function stopMic() {
+  micActive = false;
+  try { recognition.abort(); } catch(e) {}
+}
+
+function setupRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showError('Используйте Chrome для распознавания речи.'); return; }
+
+  recognition = new SR();
+  recognition.lang = 'ru-RU';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onstart  = () => { micActive = true; if (!isSpeaking) setState('listening'); };
+  recognition.onend    = () => { micActive = false; };
+
+  recognition.onresult = (e) => {
+    if (isSpeaking) return;
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+    }
+    if (final) {
+      transcript += ' ' + final;
+      clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        const text = transcript.trim();
+        transcript = '';
+        if (text.length > 2) sendToAI(text);
+      }, 400);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    micActive = false;
+    if (e.error === 'not-allowed') showError('Разрешите доступ к микрофону.');
+    // Restart on abrupt errors after a short delay
+    if (e.error !== 'aborted' && !isSpeaking) {
+      setTimeout(startMic, 500);
+    }
+  };
+}
+
+// ── Keep mic alive with a heartbeat (restarts if it dropped) ─────
+// Only fires after greeting is done
+let micEnabled = false;
+setInterval(() => {
+  if (micEnabled && !isSpeaking && recognition && !micActive) {
+    startMic();
+  }
+}, 1000);
+
+// ── AI call ──────────────────────────────────────────────────────
+async function sendToAI(userText) {
+  stopMic();
+  setState('thinking');
+
+  try {
+    const res  = await fetch(SERVER + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: userText, model: 'chat' })
+    });
+    const data = await res.json();
+    if (data.error) { showError('Ошибка: ' + data.error); setState('listening'); startMic(); return; }
+    if (data.reply) {
+      const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
+      if (musicMatch) playMusic(musicMatch[1].trim());
+      speak(data.reply, data.audio);
+    } else { setState('listening'); startMic(); }
+  } catch(err) {
+    showError('Нет соединения с сервером.');
+    setState('listening');
+    startMic();
+  }
+}
+
+// ── TTS ──────────────────────────────────────────────────────────
+function speak(text, audioB64) {
+  isSpeaking = true;
+  stopMic();
+  setState('speaking');
+
+  const binary = atob(audioB64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const blob  = new Blob([bytes], { type: 'audio/mpeg' });
+  const url   = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+
+  const done = () => {
+    URL.revokeObjectURL(url);
+    isSpeaking = false;
+    transcript = '';
+    setState('listening');
+    setTimeout(startMic, 1000);  // 1 second pause before listening again
+  };
+
+  audio.onended = done;
+  audio.onerror = done;
+  audio.play().catch(done);
+}
+
+// ── Greeting ─────────────────────────────────────────────────────
+let greeted = false;
+async function greet() {
+  if (greeted) return;
+  greeted = true;
+  setState('thinking');
+  try {
+    const res  = await fetch(SERVER + '/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Поприветствуй меня и расскажи что-нибудь интересное из новостей сегодня. Одно короткое предложение.', model: 'news' })
+    });
+    const data = await res.json();
+    if (data.reply) {
+      const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
+      if (musicMatch) playMusic(musicMatch[1].trim());
+      speak(data.reply, data.audio);
+    }
+    else            { setState('listening'); startMic(); }
+  } catch {
+    setState('listening');
+    startMic();
+  }
+}
+
+// ── Music ────────────────────────────────────────────────────────
+function playMusic(query) {
+  const encoded = encodeURIComponent(query);
+  // Open YouTube search in new tab — most reliable on all devices
+  window.open('https://www.youtube.com/results?search_query=' + encoded, '_blank');
+}
+
+function closeMusic() {
+  const frame = document.getElementById('yt-frame');
+  frame.src = '';
+  document.getElementById('yt-wrap').style.display = 'none';
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setupRecognition();
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(14,15,20,0.92);cursor:pointer;z-index:100;flex-direction:column;gap:16px;`;
+  overlay.innerHTML = `
+    <div style="font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:#c9a96e;letter-spacing:0.1em;font-style:italic;">нажмите, чтобы начать</div>
+    <div style="width:48px;height:48px;border-radius:50%;border:1px solid rgba(201,169,110,0.4);display:flex;align-items:center;justify-content:center;">
+      <div style="width:14px;height:14px;border-radius:50%;background:#c9a96e;opacity:0.7;"></div>
+    </div>`;
+  overlay.addEventListener('click', () => {
+    overlay.remove();
+    // Mic starts ONLY inside speak() after audio ends — not here
+    greet();
+  });
+  document.body.appendChild(overlay);
+});
+</script>
+</body>
+</html>
