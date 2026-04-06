@@ -102,11 +102,11 @@ const statusEl = document.getElementById('status');
 const errorEl  = document.getElementById('error');
 
 // ── State ────────────────────────────────────────────────────────
-let isSpeaking   = false;
-let silenceTimer = null;
-let transcript   = '';
-let recognition  = null;
-let micActive    = false;
+let isSpeaking    = false;
+let speakingTimer = null;   // 60s watchdog — force-resets if audio stalls
+let recognition   = null;
+let micActive     = false;
+let micEnabled    = false;
 
 function setState(state) {
   document.body.className = state;
@@ -120,70 +120,69 @@ function showError(msg) {
   setTimeout(() => errorEl.style.display = 'none', 5000);
 }
 
+// ── Speaking flag with watchdog ───────────────────────────────────
+// Prevents permanent lockup if audio.onended never fires (iOS bug)
+function setSpeaking(val) {
+  clearTimeout(speakingTimer);
+  isSpeaking = val;
+  if (val) {
+    speakingTimer = setTimeout(() => {
+      isSpeaking = false;
+      setState('listening');
+      restartMic();
+    }, 60000);
+  }
+}
+
 // ── Mic ──────────────────────────────────────────────────────────
-function startMic() {
-  if (micActive || isSpeaking) return;
-  try { recognition.start(); } catch(e) {}
+// Rebuilt fresh each turn — avoids stale recognition state on iOS Safari
+function buildRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showError('Используйте Chrome для распознавания речи.'); return null; }
+  const r = new SR();
+  r.lang           = 'ru-RU';
+  r.continuous     = false;   // single-shot: more stable on iOS
+  r.interimResults = false;   // final only: avoids double-sends
+
+  r.onstart  = () => { micActive = true; if (!isSpeaking) setState('listening'); };
+  r.onend    = () => {
+    micActive = false;
+    // Auto-restart loop while mic is enabled and not speaking
+    if (micEnabled && !isSpeaking) setTimeout(restartMic, 300);
+  };
+  r.onresult = (e) => {
+    if (isSpeaking) return;
+    const text = Array.from(e.results)
+      .filter(res => res.isFinal)
+      .map(res => res[0].transcript)
+      .join(' ')
+      .trim();
+    if (text.length > 2) sendToAI(text);
+  };
+  r.onerror = (e) => {
+    micActive = false;
+    if (e.error === 'not-allowed') { showError('Разрешите доступ к микрофону.'); return; }
+    if (e.error === 'aborted') return;
+    if (micEnabled && !isSpeaking) setTimeout(restartMic, 800);
+  };
+  return r;
+}
+
+function restartMic() {
+  if (!micEnabled || isSpeaking || micActive) return;
+  recognition = buildRecognition();
+  if (recognition) try { recognition.start(); } catch(e) {}
 }
 
 function stopMic() {
   micActive = false;
-  try { recognition.abort(); } catch(e) {}
+  try { recognition && recognition.abort(); } catch(e) {}
 }
-
-function setupRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { showError('Используйте Chrome для распознавания речи.'); return; }
-
-  recognition = new SR();
-  recognition.lang = 'ru-RU';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-
-  recognition.onstart  = () => { micActive = true; if (!isSpeaking) setState('listening'); };
-  recognition.onend    = () => { micActive = false; };
-
-  recognition.onresult = (e) => {
-    if (isSpeaking) return;
-    let final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript;
-    }
-    if (final) {
-      transcript += ' ' + final;
-      clearTimeout(silenceTimer);
-      silenceTimer = setTimeout(() => {
-        const text = transcript.trim();
-        transcript = '';
-        if (text.length > 2) sendToAI(text);
-      }, 400);
-    }
-  };
-
-  recognition.onerror = (e) => {
-    micActive = false;
-    if (e.error === 'not-allowed') showError('Разрешите доступ к микрофону.');
-    // Restart on abrupt errors after a short delay
-    if (e.error !== 'aborted' && !isSpeaking) {
-      setTimeout(startMic, 500);
-    }
-  };
-}
-
-// ── Keep mic alive with a heartbeat (restarts if it dropped) ─────
-// Only fires after greeting is done
-let micEnabled = false;
-setInterval(() => {
-  if (micEnabled && !isSpeaking && recognition && !micActive) {
-    startMic();
-  }
-}, 1000);
 
 // ── AI call ──────────────────────────────────────────────────────
 async function sendToAI(userText) {
   stopMic();
   setState('thinking');
-
   try {
     const res  = await fetch(SERVER + '/chat', {
       method: 'POST',
@@ -191,22 +190,22 @@ async function sendToAI(userText) {
       body: JSON.stringify({ message: userText, model: 'chat' })
     });
     const data = await res.json();
-    if (data.error) { showError('Ошибка: ' + data.error); setState('listening'); startMic(); return; }
+    if (data.error) { showError('Ошибка: ' + data.error); setState('listening'); restartMic(); return; }
     if (data.reply) {
       const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
       if (musicMatch) playMusic(musicMatch[1].trim());
-      speak(data.reply, data.audio);
-    } else { setState('listening'); startMic(); }
+      speak(data.audio);
+    } else { setState('listening'); restartMic(); }
   } catch(err) {
     showError('Нет соединения с сервером.');
     setState('listening');
-    startMic();
+    restartMic();
   }
 }
 
 // ── TTS ──────────────────────────────────────────────────────────
-function speak(text, audioB64) {
-  isSpeaking = true;
+function speak(audioB64) {
+  setSpeaking(true);
   stopMic();
   setState('speaking');
 
@@ -219,10 +218,9 @@ function speak(text, audioB64) {
 
   const done = () => {
     URL.revokeObjectURL(url);
-    isSpeaking = false;
-    transcript = '';
+    setSpeaking(false);
     setState('listening');
-    setTimeout(startMic, 1000);  // 1 second pause before listening again
+    setTimeout(restartMic, 800);
   };
 
   audio.onended = done;
@@ -246,32 +244,22 @@ async function greet() {
     if (data.reply) {
       const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
       if (musicMatch) playMusic(musicMatch[1].trim());
-      speak(data.reply, data.audio);
-    }
-    else            { setState('listening'); startMic(); }
+      speak(data.audio);
+    } else { setState('listening'); micEnabled = true; restartMic(); }
   } catch {
     setState('listening');
-    startMic();
+    micEnabled = true;
+    restartMic();
   }
 }
 
 // ── Music ────────────────────────────────────────────────────────
 function playMusic(query) {
-  const encoded = encodeURIComponent(query);
-  // Open YouTube search in new tab — most reliable on all devices
-  window.open('https://www.youtube.com/results?search_query=' + encoded, '_blank');
-}
-
-function closeMusic() {
-  const frame = document.getElementById('yt-frame');
-  frame.src = '';
-  document.getElementById('yt-wrap').style.display = 'none';
+  window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(query), '_blank');
 }
 
 // ── Init ─────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-  setupRecognition();
-
   const overlay = document.createElement('div');
   overlay.style.cssText = `position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(14,15,20,0.92);cursor:pointer;z-index:100;flex-direction:column;gap:16px;`;
@@ -282,7 +270,7 @@ window.addEventListener('load', () => {
     </div>`;
   overlay.addEventListener('click', () => {
     overlay.remove();
-    // Mic starts ONLY inside speak() after audio ends — not here
+    micEnabled = true;
     greet();
   });
   document.body.appendChild(overlay);

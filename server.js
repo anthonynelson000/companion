@@ -166,49 +166,48 @@ app.post('/chat', async (req, res) => {
   }
 
   const useModel = 'claude-haiku-4-5-20251001';
-  const tools    = undefined;
+
+  // Hard 25s timeout — Railway kills at 30s, so we respond with an error before that
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('timeout')), 25000)
+  );
 
   try {
-    const newsAddition = '';
-    
-    // Detect if user wants a detailed response
     const detailKeywords = ['расскажи подробно', 'расскажи больше', 'подробнее', 'расскажи всё', 'хочу знать больше', 'объясни', 'расскажи про', 'прочитай', 'читай', 'книгу', 'стихи', 'поэму', 'историю'];
     const wantsDetail = detailKeywords.some(kw => message.toLowerCase().includes(kw));
     const maxTok = wantsDetail ? 400 : 120;
-    
-    const params = { model: useModel, max_tokens: maxTok, system: SYSTEM_PROMPT + newsAddition, messages: history };
-    if (tools) params.tools = tools;
 
-    const response = await client.messages.create(params);
-    const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+    const work = async () => {
+      const params = { model: useModel, max_tokens: maxTok, system: SYSTEM_PROMPT, messages: history };
+      const response = await client.messages.create(params);
+      const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
 
-    if (!reply) return res.json({ reply: '' });
+      if (!reply) return res.json({ reply: '' });
 
-    await saveMessage('assistant', reply);
+      await saveMessage('assistant', reply);
 
-    // Strip unsolicited topics from response
-    const BANNED_TOPICS = ['new york times', 'nyt', 'metropolitan', 'большой театр', 'мариинка', 'согласно', 'исследования показывают', 'эксперты говорят', 'важно отметить', 'вам следует', 'я рекомендую', 'я предлагаю'];
-    let filteredReply = reply;
-    const sentences = reply.split(/(?<=[.!?])\s+/);
-    const filtered = sentences.filter(s => !BANNED_TOPICS.some(t => s.toLowerCase().includes(t)));
-    if (filtered.length > 0) filteredReply = filtered.join(' ');
+      const BANNED_TOPICS = ['new york times', 'nyt', 'metropolitan', 'большой театр', 'мариинка', 'согласно', 'исследования показывают', 'эксперты говорят', 'важно отметить', 'вам следует', 'я рекомендую', 'я предлагаю'];
+      const sentences = reply.split(/(?<=[.!?])\s+/);
+      const filtered = sentences.filter(s => !BANNED_TOPICS.some(t => s.toLowerCase().includes(t)));
+      let filteredReply = filtered.length > 0 ? filtered.join(' ') : reply;
 
-    // Ensure response never ends mid-sentence - trim to last complete sentence
-    const lastPunct = Math.max(
-      filteredReply.lastIndexOf('.'),
-      filteredReply.lastIndexOf('!'),
-      filteredReply.lastIndexOf('?')
-    );
-    if (lastPunct > 0 && lastPunct < filteredReply.length - 1) {
-      filteredReply = filteredReply.substring(0, lastPunct + 1);
-    }
-    
-    const spokenReply = filteredReply.replace(/\[MUSIC:[^\]]*\]/g, '').trim();
-    const audioBuffer = await elevenLabsTTS(spokenReply);
-    res.json({ reply, audio: audioBuffer.toString('base64') });
+      const lastPunct = Math.max(filteredReply.lastIndexOf('.'), filteredReply.lastIndexOf('!'), filteredReply.lastIndexOf('?'));
+      if (lastPunct > 0 && lastPunct < filteredReply.length - 1) {
+        filteredReply = filteredReply.substring(0, lastPunct + 1);
+      }
+
+      const spokenReply = filteredReply.replace(/\[MUSIC:[^\]]*\]/g, '').trim();
+      const audioBuffer = await elevenLabsTTS(spokenReply);
+      res.json({ reply, audio: audioBuffer.toString('base64') });
+    };
+
+    await Promise.race([work(), timeout]);
 
   } catch (err) {
     console.error(err);
+    if (err.message === 'timeout') {
+      return res.status(503).json({ error: 'Наташа думает слишком долго. Попробуйте ещё раз.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });
