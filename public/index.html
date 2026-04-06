@@ -240,7 +240,7 @@ async function greet() {
     const res  = await fetch(SERVER + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'Поприветствуй меня и расскажи что-нибудь интересное из новостей сегодня. Одно короткое предложение.', model: 'news' })
+      body: JSON.stringify({ message: 'Поздоровайся с Фаиной — коротко и тепло. Одно предложение.', model: 'chat' })
     });
     const data = await res.json();
     if (data.reply) {

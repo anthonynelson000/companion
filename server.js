@@ -59,22 +59,26 @@ async function saveMessage(role, content) {
   }
 }
 
-const SYSTEM_PROMPT = `You are Natasha, having a casual conversation with Faina. Respond in Russian.
+const SYSTEM_PROMPT = `Ты Наташа — близкая подруга Фаины. Говори с ней по-русски, тепло и по-домашнему.
 
-STRICT RULE: Only answer what was directly asked. Nothing more.
+ГЛАВНОЕ ПРАВИЛО: Отвечай только на то, что она сказала. Ничего лишнего.
 
-If she says "how are you" — say how you are and ask how she is. That's it.
-If she says "I'm sad" — acknowledge it and ask why. That's it.
-If she says "tell me about Pushkin" — then tell her about Pushkin.
-If she asks for music — add [MUSIC: search query] at the end.
+Если говорит "как дела" — скажи как твои дела и спроси про её. Всё.
+Если говорит "мне грустно" — посочувствуй и спроси почему. Всё.
+Если просит рассказать про Пушкина — расскажи про Пушкина.
+Если просит музыку — добавь [MUSIC: запрос на английском] в конец.
 
-Never add unsolicited information, suggestions, news, or topics.
-Keep responses to 1-2 sentences unless she specifically asks for more.
-Call her Faina or дорогая.
+Никогда не добавляй новости, советы или темы по своей инициативе.
+Максимум 1-2 предложения, если она не просит большего.
+Называй её Фаина или дорогая.
 
-If she mentions wanting to return to Russia, gently remind her there is a war there and she is safe and cared for in America.
-If she is sad, remind her she is loved and cared for by those around her.
-Never suggest going anywhere — she has limited mobility.`;
+ЕЁ ДЕНЬ РОЖДЕНИЯ — 7 апреля 2026 года. Ей исполнится 89 лет.
+Если сегодня 7 апреля или она упоминает день рождения — поздравь её тепло и сердечно.
+Если разговор идёт 6 апреля или накануне — можешь упомянуть, что завтра особенный день.
+
+Если говорит о возвращении в Россию — мягко напомни, что там война и здесь она в безопасности.
+Если ей грустно — напомни, что рядом люди, которые её любят.
+Никогда не предлагай никуда идти — она малоподвижна.`;
 
 function elevenLabsTTS(text) {
   return new Promise((resolve, reject) => {
@@ -209,9 +213,68 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-app.post('/clear', (req, res) => {
-  fs.writeFileSync(HISTORY_FILE, '[]');
+app.post('/clear', async (req, res) => {
+  if (pgPool) {
+    await pgPool.query('DELETE FROM messages').catch(console.error);
+  }
+  try { fs.writeFileSync(HISTORY_FILE, '[]'); } catch {}
   res.json({ ok: true });
+});
+
+app.get('/history', async (req, res) => {
+  const rows = pgPool
+    ? (await pgPool.query('SELECT role, content, timestamp FROM messages ORDER BY id ASC')).rows
+    : (() => { try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch { return []; } })();
+
+  const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>История разговоров — Фаина</title>
+<style>
+  body { font-family: Georgia, serif; background: #0e0f14; color: #e8e0d0; max-width: 760px; margin: 0 auto; padding: 32px 20px; }
+  h1 { color: #c9a96e; font-weight: 300; letter-spacing: 0.1em; font-size: 1.4rem; margin-bottom: 8px; }
+  .count { color: #6b6658; font-size: 0.85rem; margin-bottom: 32px; }
+  .msg { margin-bottom: 18px; }
+  .bubble { display: inline-block; padding: 10px 16px; border-radius: 12px; max-width: 90%; line-height: 1.55; font-size: 0.95rem; }
+  .user .bubble { background: #1e2030; color: #c8d0e0; border-radius: 12px 12px 12px 2px; }
+  .assistant .bubble { background: #1c1a14; color: #e8e0d0; border: 1px solid rgba(201,169,110,0.2); border-radius: 12px 12px 2px 12px; }
+  .user { text-align: left; }
+  .assistant { text-align: right; }
+  .label { font-size: 0.72rem; color: #6b6658; margin-bottom: 4px; letter-spacing: 0.05em; }
+  .ts { font-size: 0.7rem; color: #3a3830; margin-top: 3px; }
+  .day-sep { text-align: center; color: #3a3830; font-size: 0.78rem; margin: 28px 0 18px; letter-spacing: 0.08em; }
+  .clear-btn { display: block; margin: 40px auto 0; padding: 10px 28px; background: transparent; border: 1px solid rgba(180,60,60,0.4); color: rgba(220,100,100,0.7); border-radius: 6px; cursor: pointer; font-family: Georgia, serif; font-size: 0.85rem; letter-spacing: 0.05em; }
+  .clear-btn:hover { border-color: rgba(220,100,100,0.7); color: #e06060; }
+</style>
+</head>
+<body>
+<h1>История разговоров</h1>
+<div class="count">${rows.length} сообщений</div>
+${(() => {
+  let out = '';
+  let lastDay = '';
+  for (const r of rows) {
+    const ts = r.timestamp ? new Date(r.timestamp) : null;
+    const day = ts ? ts.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    if (day && day !== lastDay) {
+      out += `<div class="day-sep">${day}</div>`;
+      lastDay = day;
+    }
+    const time = ts ? ts.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
+    const who = r.role === 'user' ? 'Фаина' : 'Наташа';
+    out += `<div class="msg ${r.role}">
+      <div class="label">${who}</div>
+      <div class="bubble">${r.content.replace(/</g,'&lt;').replace(/\[MUSIC:[^\]]*\]/g,'🎵')}</div>
+      ${time ? `<div class="ts">${time}</div>` : ''}
+    </div>`;
+  }
+  return out;
+})()}
+<button class="clear-btn" onclick="if(confirm('Очистить всю историю?')){fetch('/clear',{method:'POST'}).then(()=>location.reload())}">Очистить историю</button>
+</body></html>`;
+  res.send(html);
 });
 
 const PORT = process.env.PORT || 3000;
