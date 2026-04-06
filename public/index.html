@@ -138,17 +138,19 @@ function startListening() {
   rec.interimResults = false;
 
   let silenceTimer = null;
+  let gotResult = false;
   rec.onstart = () => {
     setStatus('listening');
     log('listening…');
-    // Force-stop after 8 seconds if nothing heard — iOS sometimes misses silence
     silenceTimer = setTimeout(() => {
-      log('silence timeout — stopping rec');
+      log('silence timeout — forcing stop');
       try { rec.stop(); } catch(e) {}
     }, 8000);
   };
 
   rec.onresult = (e) => {
+    gotResult = true;
+    clearTimeout(silenceTimer);
     const text = Array.from(e.results)
       .filter(r => r.isFinal)
       .map(r => r[0].transcript)
@@ -158,7 +160,6 @@ function startListening() {
       setStatus('thinking');
       sendToAI(text);
     } else {
-      // Nothing heard — show mic again
       setStatus('idle');
       showMic();
     }
@@ -176,8 +177,12 @@ function startListening() {
 
   rec.onend = () => {
     clearTimeout(silenceTimer);
-    log('rec ended');
-    if (document.body.className === 'idle') showMic();
+    log(`rec ended — gotResult:${gotResult} state:${document.body.className}`);
+    // Show mic if no result was processed (timeout, no speech detected, etc)
+    if (!gotResult && document.body.className !== 'thinking' && document.body.className !== 'speaking') {
+      setStatus('idle');
+      showMic();
+    }
   };
 
   try { rec.start(); log('rec.start()'); }
