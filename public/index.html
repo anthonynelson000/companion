@@ -241,11 +241,12 @@ async function greet() {
       body: JSON.stringify({ message: 'Поздоровайся с Фаиной — коротко и тепло. Одно предложение.', model: 'chat' })
     });
     const data = await res.json();
+    micEnabled = true;
     if (data.reply) {
       const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
       if (musicMatch) playMusic(musicMatch[1].trim());
       speak(data.audio);
-    } else { setState('listening'); micEnabled = true; restartMic(); }
+    } else { setState('listening'); restartMic(); }
   } catch {
     setState('listening');
     micEnabled = true;
