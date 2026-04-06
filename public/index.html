@@ -176,13 +176,6 @@ function stopMic() {
   try { recognition && recognition.abort(); } catch(e) {}
 }
 
-// ── Tap anywhere to speak (except while speaking/thinking) ────────
-document.addEventListener('click', () => {
-  if (!appReady || isSpeaking || micActive) return;
-  if (document.body.classList.contains('thinking')) return;
-  startListening();
-});
-
 // ── AI call ──────────────────────────────────────────────────────
 async function sendToAI(userText) {
   stopMic();
@@ -265,7 +258,8 @@ window.addEventListener('load', () => {
     <div style="width:64px;height:64px;border-radius:50%;border:1px solid rgba(201,169,110,0.4);display:flex;align-items:center;justify-content:center;">
       <div style="width:20px;height:20px;border-radius:50%;background:#c9a96e;opacity:0.7;"></div>
     </div>`;
-  overlay.addEventListener('click', () => {
+  overlay.addEventListener('click', (e) => {
+    e.stopPropagation();
     overlay.remove();
     appReady = true;
     greet();
