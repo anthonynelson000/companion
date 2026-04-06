@@ -10,7 +10,7 @@ const app    = express();
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const ELEVENLABS_KEY   = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE = 'XrExE9yKIg1WjnnlVkGX'; // Matilda — warm, multilingual
+const ELEVENLABS_VOICE = '9AE7A1Ivnw8jKr8Us0ch'; // Matilda — warm, multilingual
 
 app.use(cors());
 app.use(express.json());
