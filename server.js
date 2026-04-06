@@ -192,9 +192,34 @@ app.post('/chat', async (req, res) => {
     const maxTok = wantsDetail ? 400 : 120;
 
     const work = async () => {
-      const params = { model: useModel, max_tokens: maxTok, system: SYSTEM_PROMPT, messages: history };
+      const params = {
+        model: useModel,
+        max_tokens: maxTok,
+        system: SYSTEM_PROMPT,
+        messages: history,
+        tools: [{ type: "web_search_20250305", name: "web_search" }]
+      };
       const response = await client.messages.create(params);
-      const reply = response.content.filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+      // With web search, response may have multiple turns — extract final text
+      let reply = '';
+      if (response.stop_reason === 'tool_use') {
+        // Claude used search — need to process tool results
+        const toolUseBlock = response.content.find(b => b.type === 'tool_use');
+        if (toolUseBlock) {
+          // Send tool result back to get final answer
+          const toolMessages = [
+            ...history,
+            { role: 'assistant', content: response.content },
+            { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUseBlock.id, content: 'Search completed.' }] }
+          ];
+          const followUp = await client.messages.create({
+            model: useModel, max_tokens: maxTok, system: SYSTEM_PROMPT, messages: toolMessages
+          });
+          reply = followUp.content.filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+        }
+      } else {
+        reply = response.content.filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+      }
 
       if (!reply) return res.json({ reply: '' });
 
