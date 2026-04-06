@@ -214,8 +214,15 @@ async function sendToAI(text) {
     const data = await res.json();
     log(`reply: ${data.reply ? data.reply.substring(0,40)+'…' : 'empty'}`);
     if (data.error) { showError('Ошибка: ' + data.error); setStatus('idle'); showMic(); return; }
-    if (data.reply)  { speak(data.audio); }
-    else             { setStatus('idle'); showMic(); }
+    if (data.reply) {
+      const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
+      if (musicMatch) {
+        const query = musicMatch[1].trim();
+        log(`opening music: ${query}`);
+        window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(query), '_blank');
+      }
+      speak(data.audio);
+    } else { setStatus('idle'); showMic(); }
   } catch(err) {
     log(`fetch error: ${err}`);
     showError('Нет соединения.');
