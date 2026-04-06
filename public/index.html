@@ -53,12 +53,22 @@
     letter-spacing: 0.18em; color: rgba(201,169,110,0.5); text-transform: uppercase; }
   .status { margin-top: 32px; font-size: 1.4rem; font-weight: 300; font-style: italic;
     color: var(--muted); letter-spacing: 0.04em; height: 1.6em; text-align: center; transition: color 0.4s; }
-  body.listening .status { color: var(--blue); }
-  body.thinking  .status { color: var(--gold-dim); }
-  body.speaking  .status { color: var(--gold); }
   .error-banner { display: none; position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
     background: rgba(180,60,60,0.85); color: #fff; padding: 14px 28px; border-radius: 10px;
     font-size: 1.1rem; text-align: center; max-width: 320px; }
+  .mic-btn { margin-top: 40px; width: 80px; height: 80px; border-radius: 50%;
+    border: 2px solid rgba(201,169,110,0.4); background: rgba(201,169,110,0.06);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: border-color 0.3s, background 0.3s; -webkit-tap-highlight-color: transparent; }
+  body.idle .mic-btn { border-color: rgba(201,169,110,0.5); }
+  body.listening .mic-btn { border-color: var(--blue); background: rgba(106,180,232,0.12); }
+  body.thinking .mic-btn  { border-color: rgba(201,169,110,0.2); }
+  body.speaking .mic-btn  { border-color: rgba(201,169,110,0.2); }
+  .mic-icon { width: 32px; height: 32px; }
+  body.idle .mic-icon path      { fill: rgba(201,169,110,0.7); }
+  body.listening .mic-icon path { fill: var(--blue); }
+  body.thinking .mic-icon path  { fill: rgba(201,169,110,0.25); }
+  body.speaking .mic-icon path  { fill: rgba(201,169,110,0.25); }
 </style>
 </head>
 <body class="idle">
@@ -70,6 +80,14 @@
   <div class="bar"></div>
 </div>
 <div class="status" id="status">слушаю…</div>
+<button class="mic-btn" id="micBtn" onclick="startListening()">
+  <svg class="mic-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 3C14.3 3 13 4.3 13 6v10c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z"/>
+    <path d="M8 14c0 4.4 3.6 8 8 8s8-3.6 8-8" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <line x1="16" y1="22" x2="16" y2="27" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="27" x2="20" y2="27" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+</button>
 <div class="error-banner" id="error"></div>
 
 
@@ -91,7 +109,7 @@ let appReady      = false;
 function setState(state) {
   document.body.className = state;
   const labels = {
-    idle:      'нажмите чтобы говорить',
+    idle:      'нажмите микрофон',
     listening: 'слушаю…',
     thinking:  'думаю…',
     speaking:  'говорю…'
