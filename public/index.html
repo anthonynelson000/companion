@@ -130,22 +130,21 @@ function showError(msg) {
   setTimeout(() => errorEl.style.display = 'none', 5000);
 }
 
-// ── iOS audio unlock ─────────────────────────────────────────────
-// Safari blocks audio unless first played inside a user gesture.
-// We create and immediately play a silent buffer on the opening tap.
+// ── Audio unlock ─────────────────────────────────────────────────
+// Browsers block audio not triggered inside a user gesture.
+// We pre-create one Audio element and reuse it for all playback.
+const sharedAudio = new Audio();
 let audioUnlocked = false;
+
 function unlockAudio() {
   if (audioUnlocked) return;
   audioUnlocked = true;
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const buf = ctx.createBuffer(1, 1, 22050);
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  src.connect(ctx.destination);
-  src.start(0);
-  ctx.resume();
+  // Play a silent WAV to unlock the audio pipeline inside the gesture
+  sharedAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+  sharedAudio.play().catch(() => {});
   log('audio unlocked');
 }
+
 function setSpeaking(val) {
   clearTimeout(speakingTimer);
   isSpeaking = val;
@@ -237,9 +236,8 @@ function speak(audioB64) {
   const binary = atob(audioB64);
   const bytes  = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const blob  = new Blob([bytes], { type: 'audio/mpeg' });
-  const url   = URL.createObjectURL(blob);
-  const audio = new Audio(url);
+  const blob = new Blob([bytes], { type: 'audio/mpeg' });
+  const url  = URL.createObjectURL(blob);
 
   const done = () => {
     URL.revokeObjectURL(url);
@@ -247,9 +245,10 @@ function speak(audioB64) {
     setState('idle');
   };
 
-  audio.onended = done;
-  audio.onerror = (err) => { log(`audio error: ${err.type}`); done(); };
-  audio.play()
+  sharedAudio.onended = done;
+  sharedAudio.onerror = (err) => { log(`audio error: ${err.type}`); done(); };
+  sharedAudio.src = url;
+  sharedAudio.play()
     .then(() => log('audio playing'))
     .catch(err => { log(`audio play failed: ${err}`); done(); });
 }
