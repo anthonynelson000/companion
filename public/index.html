@@ -59,7 +59,8 @@
   .mic-btn { margin-top: 40px; width: 80px; height: 80px; border-radius: 50%;
     border: 2px solid rgba(201,169,110,0.4); background: rgba(201,169,110,0.06);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
-    transition: border-color 0.3s, background 0.3s; -webkit-tap-highlight-color: transparent; }
+    transition: border-color 0.3s, background 0.3s, opacity 0.3s; -webkit-tap-highlight-color: transparent; }
+  .mic-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
   body.idle .mic-btn { border-color: rgba(201,169,110,0.5); }
   body.listening .mic-btn { border-color: var(--blue); background: rgba(106,180,232,0.12); }
   body.thinking .mic-btn  { border-color: rgba(201,169,110,0.2); }
@@ -243,8 +244,11 @@ function speak(audioB64) {
     URL.revokeObjectURL(url);
     setSpeaking(false);
     setState('idle');
+    document.getElementById('micBtn').disabled = false;
+    log('audio ended — mic re-enabled');
   };
 
+  document.getElementById('micBtn').disabled = true;
   sharedAudio.onended = done;
   sharedAudio.onerror = (err) => { log(`audio error: ${err.type}`); done(); };
   sharedAudio.src = url;
