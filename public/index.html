@@ -167,7 +167,6 @@ function setSpeaking(val) {
 function startListening() {
   log(`startListening — appReady:${appReady} speaking:${isSpeaking} micActive:${micActive}`);
   if (!appReady || isSpeaking || micActive) { log(`BLOCKED — speaking:${isSpeaking} micActive:${micActive}`); return; }
-  setState('listening');
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showError('Используйте Safari для голосового ввода.'); log('NO SR API'); return; }
@@ -178,7 +177,7 @@ function startListening() {
   recognition.interimResults = false;
 
   recognition.onstart  = () => { micActive = true; setState('listening'); log('mic started'); };
-  recognition.onend    = () => { micActive = false; if (!isSpeaking) setState('idle'); log('mic ended'); };
+  recognition.onend    = () => { micActive = false; setState('idle'); log('mic ended'); };
 
   recognition.onresult = (e) => {
     micActive = false;
@@ -260,9 +259,8 @@ function speak(audioB64) {
     setSpeaking(false);
     micActive = false;
     try { recognition && recognition.abort(); } catch(e) {}
-    log('audio ended — showing mic, auto-starting');
+    log('audio ended — showing mic button');
     setState('idle');
-    setTimeout(() => startListening(), 400);
   };
 
   audio.onended = done;
