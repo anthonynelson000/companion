@@ -177,8 +177,21 @@ function startListening() {
   recognition.continuous     = false;
   recognition.interimResults = false;
 
-  recognition.onstart  = () => { micActive = true; setState('listening'); showBtn(false); log('mic started'); };
-  recognition.onend    = () => { micActive = false; setState('idle'); if (!isSpeaking) showBtn(true); log('mic ended'); };
+  let watchdog = null;
+  const clearWatchdog = () => { clearTimeout(watchdog); watchdog = null; };
+  const startWatchdog = () => {
+    clearWatchdog();
+    watchdog = setTimeout(() => {
+      log('watchdog — recognition timed out, resetting');
+      micActive = false;
+      try { recognition && recognition.abort(); } catch(e) {}
+      setState('idle');
+      showBtn(true);
+    }, 10000);
+  };
+
+  recognition.onstart  = () => { micActive = true; setState('listening'); showBtn(false); startWatchdog(); log('mic started'); };
+  recognition.onend    = () => { clearWatchdog(); micActive = false; setState('idle'); if (!isSpeaking) showBtn(true); log('mic ended'); };
 
   recognition.onresult = (e) => {
     micActive = false;
