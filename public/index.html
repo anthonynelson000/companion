@@ -159,15 +159,7 @@ function setSpeaking(val) {
 // ── Single-shot mic — built fresh each time, started by user tap ──
 function startListening() {
   log(`startListening — appReady:${appReady} speaking:${isSpeaking} micActive:${micActive}`);
-  if (!appReady || isSpeaking) { log('BLOCKED — speaking'); return; }
-  if (micActive) {
-    // Already listening — abort and restart fresh
-    log('mic already active, restarting');
-    try { recognition && recognition.abort(); } catch(e) {}
-    micActive = false;
-    setTimeout(startListening, 300);
-    return;
-  }
+  if (!appReady || isSpeaking || micActive) { log(`BLOCKED — speaking:${isSpeaking} micActive:${micActive}`); return; }
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showError('Используйте Safari для голосового ввода.'); log('NO SR API'); return; }
