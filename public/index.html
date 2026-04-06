@@ -23,7 +23,6 @@
     background: radial-gradient(ellipse 80% 60% at 50% 0%, #1a1c2e 0%, transparent 70%),
     radial-gradient(ellipse 60% 40% at 50% 100%, #0c0e1a 0%, transparent 60%), var(--bg); }
 
-  /* ── Waveform avatar ── */
   .waveform { display: flex; align-items: center; justify-content: center; gap: 8px; height: 160px; width: 300px; }
   .waveform .bar { width: 6px; border-radius: 3px; background: var(--gold-dim); transition: background 0.4s; }
 
@@ -37,15 +36,12 @@
   .bar:nth-child(13){height:18px;animation-delay:0s}
   @keyframes idle-breathe { 0%,100%{transform:scaleY(0.4);opacity:0.25} 50%{transform:scaleY(0.55);opacity:0.35} }
 
-  /* listening — calm ripple in blue */
   body.listening .bar { background: var(--blue); animation: listen-wave 1.6s ease-in-out infinite; }
   @keyframes listen-wave { 0%,100%{transform:scaleY(0.5);opacity:0.5} 50%{transform:scaleY(1.1);opacity:0.9} }
 
-  /* thinking — slow gold pulse, all bars together */
   body.thinking .bar { background: var(--gold-dim); animation: think-pulse 0.9s ease-in-out infinite; }
   @keyframes think-pulse { 0%,100%{transform:scaleY(0.6);opacity:0.4} 50%{transform:scaleY(0.85);opacity:0.7} }
 
-  /* speaking — full gold, fast wave */
   body.speaking .bar { background: var(--gold); animation: speak-wave 0.5s ease-in-out infinite; }
   @keyframes speak-wave { 0%,100%{transform:scaleY(0.7);opacity:0.7} 50%{transform:scaleY(1.3);opacity:1} }
 
@@ -57,19 +53,11 @@
     background: rgba(180,60,60,0.85); color: #fff; padding: 14px 28px; border-radius: 10px;
     font-size: 1.1rem; text-align: center; max-width: 320px; }
   .mic-btn { margin-top: 40px; width: 80px; height: 80px; border-radius: 50%;
-    border: 2px solid rgba(201,169,110,0.4); background: rgba(201,169,110,0.06);
+    border: 2px solid rgba(201,169,110,0.5); background: rgba(201,169,110,0.06);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
-    transition: border-color 0.3s, background 0.3s, opacity 0.3s; -webkit-tap-highlight-color: transparent; }
-  .mic-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
-  body.idle .mic-btn { border-color: rgba(201,169,110,0.5); }
-  body.listening .mic-btn { border-color: var(--blue); background: rgba(106,180,232,0.12); }
-  body.thinking .mic-btn  { border-color: rgba(201,169,110,0.2); }
-  body.speaking .mic-btn  { border-color: rgba(201,169,110,0.2); }
+    transition: border-color 0.3s, background 0.3s; -webkit-tap-highlight-color: transparent; }
   .mic-icon { width: 32px; height: 32px; }
-  body.idle .mic-icon path      { fill: rgba(201,169,110,0.7); }
-  body.listening .mic-icon path { fill: var(--blue); }
-  body.thinking .mic-icon path  { fill: rgba(201,169,110,0.25); }
-  body.speaking .mic-icon path  { fill: rgba(201,169,110,0.25); }
+  .mic-icon path { fill: rgba(201,169,110,0.7); }
 </style>
 </head>
 <body class="idle">
@@ -80,26 +68,24 @@
   <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
   <div class="bar"></div>
 </div>
-<div class="status" id="status">слушаю…</div>
-<button class="mic-btn" id="micBtn" onclick="startListening()" style="visibility:hidden;">
+<div class="status" id="status"></div>
+<button id="micBtn" class="mic-btn" style="visibility:hidden;" onclick="onMicTap()">
   <svg class="mic-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M16 3C14.3 3 13 4.3 13 6v10c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z"/>
     <path d="M8 14c0 4.4 3.6 8 8 8s8-3.6 8-8" stroke-width="2" stroke-linecap="round" fill="none"/>
     <line x1="16" y1="22" x2="16" y2="27" stroke-width="2" stroke-linecap="round"/>
-    <line x1="12" y1="27" x2="20" y2="27" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="27" x2="20" y2="27" stroke-width="2" stroke-linecent="round"/>
   </svg>
 </button>
-<div class="error-banner" id="error"></div>
+<div class="error-banner" id="errorBanner"></div>
 <div id="debug" style="position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;max-height:160px;overflow-y:auto;z-index:999;"></div>
 
-
 <script>
-const SERVER = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
-  ? 'http://localhost:3000' : '';
-
+const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
 const statusEl = document.getElementById('status');
-const errorEl  = document.getElementById('error');
+const errorEl  = document.getElementById('errorBanner');
 const debugEl  = document.getElementById('debug');
+const micBtn   = document.getElementById('micBtn');
 
 function log(msg) {
   const t = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -107,187 +93,139 @@ function log(msg) {
   debugEl.scrollTop = debugEl.scrollHeight;
 }
 
-// ── State ────────────────────────────────────────────────────────
-let isSpeaking    = false;
-let speakingTimer = null;
-let recognition   = null;
-let micActive     = false;
-let appReady      = false;
-
-function setState(state) {
-  document.body.className = state;
-  const labels = {
-    idle:      'нажмите микрофон',
-    listening: 'слушаю…',
-    thinking:  'думаю…',
-    speaking:  'говорю…'
-  };
-  statusEl.textContent = labels[state] || '';
-}
-
-function showBtn(visible) {
-  const btn = document.getElementById('micBtn');
-  if (!btn) return;
-  btn.style.visibility = visible ? 'visible' : 'hidden';
-  btn.disabled = !visible;
-}
-
 function showError(msg) {
-  errorEl.style.display = 'block';
   errorEl.textContent = msg;
+  errorEl.style.display = 'block';
   setTimeout(() => errorEl.style.display = 'none', 5000);
 }
 
-// ── Audio unlock ─────────────────────────────────────────────────
-// One silent play inside the user gesture unlocks the audio session.
-// After that, new Audio() elements work fine at full volume.
-let audioUnlocked = false;
-let sharedAudio = null;
+// ── The only two functions that touch the mic button ─────────────
+function showMic()  { micBtn.style.visibility = 'visible'; micBtn.disabled = false; log('mic btn: SHOW'); }
+function hideMic()  { micBtn.style.visibility = 'hidden';  micBtn.disabled = true;  log('mic btn: HIDE'); }
+
+// ── Visual state (never touches mic button) ──────────────────────
+function setStatus(state) {
+  document.body.className = state;
+  statusEl.textContent = { idle:'нажмите микрофон', listening:'слушаю…', thinking:'думаю…', speaking:'говорю…' }[state] || '';
+}
+
+// ── Audio (single shared element, created on first tap) ──────────
+let audio = null;
+
 function unlockAudio() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
-  // Create element INSIDE the gesture handler so iOS trusts it
-  sharedAudio = new Audio();
-  sharedAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
-  sharedAudio.play().catch(() => {});
-  log('audio unlocked');
+  // Must be called inside a user gesture so iOS allows playback
+  audio = new Audio();
+  audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+  audio.play().catch(() => {});
+  log('audio element created and unlocked');
 }
 
-function setSpeaking(val) {
-  clearTimeout(speakingTimer);
-  isSpeaking = val;
-  if (val) {
-    speakingTimer = setTimeout(() => {
-      isSpeaking = false;
-      setState('idle');
-    }, 60000);
-  }
+// ── Mic tap handler ──────────────────────────────────────────────
+function onMicTap() {
+  log('mic tapped');
+  hideMic();
+  startListening();
 }
 
-// ── Single-shot mic — built fresh each time, started by user tap ──
+// ── Speech recognition ───────────────────────────────────────────
 function startListening() {
-  log(`startListening — appReady:${appReady} speaking:${isSpeaking} micActive:${micActive}`);
-  if (!appReady || isSpeaking || micActive) { log(`BLOCKED — speaking:${isSpeaking} micActive:${micActive}`); return; }
-
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { showError('Используйте Safari для голосового ввода.'); log('NO SR API'); return; }
+  if (!SR) { showError('Используйте Safari для голосового ввода.'); showMic(); return; }
 
-  recognition = new SR();
-  recognition.lang           = 'ru-RU';
-  recognition.continuous     = false;
-  recognition.interimResults = false;
+  const rec = new SR();
+  rec.lang           = 'ru-RU';
+  rec.continuous     = false;
+  rec.interimResults = false;
 
-  let watchdog = null;
-  const clearWatchdog = () => { clearTimeout(watchdog); watchdog = null; };
-  const startWatchdog = () => {
-    clearWatchdog();
-    watchdog = setTimeout(() => {
-      log('watchdog — recognition timed out, resetting');
-      micActive = false;
-      try { recognition && recognition.abort(); } catch(e) {}
-      setState('idle');
-      showBtn(true);
-    }, 10000);
-  };
+  rec.onstart = () => { setStatus('listening'); log('listening…'); };
 
-  recognition.onstart  = () => { micActive = true; setState('listening'); showBtn(false); startWatchdog(); log('mic started'); };
-  recognition.onend    = () => { clearWatchdog(); micActive = false; setState('idle'); if (!isSpeaking) showBtn(true); log('mic ended'); };
-
-  recognition.onresult = (e) => {
-    micActive = false;
+  rec.onresult = (e) => {
     const text = Array.from(e.results)
       .filter(r => r.isFinal)
       .map(r => r[0].transcript)
-      .join(' ')
-      .trim();
+      .join(' ').trim();
     log(`heard: "${text}"`);
-    if (text.length > 1) sendToAI(text);
-    else setState('idle');
+    if (text.length > 1) {
+      setStatus('thinking');
+      sendToAI(text);
+    } else {
+      // Nothing heard — show mic again
+      setStatus('idle');
+      showMic();
+    }
   };
 
-  recognition.onerror = (e) => {
-    micActive = false;
+  rec.onerror = (e) => {
     log(`mic error: ${e.error}`);
-    if (e.error === 'not-allowed') { showError('Разрешите доступ к микрофону в настройках Safari.'); return; }
-    // audio-capture = iOS mic conflict; reset and allow retry
-    setState('idle');
-    document.getElementById('micBtn').disabled = false;
+    if (e.error === 'not-allowed') {
+      showError('Разрешите доступ к микрофону в настройках Safari.');
+    }
+    // Always show mic on any error so Faina can try again
+    setStatus('idle');
+    showMic();
   };
 
-  try { recognition.start(); log('recognition.start() called'); } catch(e) { log(`start exception: ${e}`); micActive = false; setState('idle'); }
+  rec.onend = () => {
+    log('rec ended');
+    // onend fires after onresult — only show mic if we're still idle
+    // (if sendToAI was called, state is 'thinking' and we don't show mic)
+    if (document.body.className === 'idle') showMic();
+  };
+
+  try { rec.start(); log('rec.start()'); }
+  catch(e) { log(`rec.start failed: ${e}`); setStatus('idle'); showMic(); }
 }
 
-function stopMic() {
-  micActive = false;
-  try { recognition && recognition.abort(); } catch(e) {}
-}
-
-// ── AI call ──────────────────────────────────────────────────────
-async function sendToAI(userText) {
-  micActive = false;  // mic hardware is done, only server call in flight now
-  stopMic();
-  setState('thinking');
-  log(`sending to AI: "${userText}"`);
+// ── Send to AI ───────────────────────────────────────────────────
+async function sendToAI(text) {
   try {
     const res  = await fetch(SERVER + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userText, model: 'chat' })
+      body: JSON.stringify({ message: text, model: 'chat' })
     });
     const data = await res.json();
-    log(`server reply: ${data.error ? 'ERROR:'+data.error : data.reply ? data.reply.substring(0,40)+'…' : 'empty'}`);
-    if (data.error) { showError('Ошибка: ' + data.error); setState('idle'); return; }
-    if (data.reply) {
-      const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
-      if (musicMatch) playMusic(musicMatch[1].trim());
-      speak(data.audio);
-    } else { setState('idle'); }
+    log(`reply: ${data.reply ? data.reply.substring(0,40)+'…' : 'empty'}`);
+    if (data.error) { showError('Ошибка: ' + data.error); setStatus('idle'); showMic(); return; }
+    if (data.reply)  { speak(data.audio); }
+    else             { setStatus('idle'); showMic(); }
   } catch(err) {
     log(`fetch error: ${err}`);
-    showError('Нет соединения с сервером.');
-    setState('idle');
+    showError('Нет соединения.');
+    setStatus('idle');
+    showMic();
   }
 }
 
-// ── TTS ──────────────────────────────────────────────────────────
+// ── Speak ────────────────────────────────────────────────────────
 function speak(audioB64) {
-  log(`speak called, audio length: ${audioB64 ? audioB64.length : 0}`);
-  setSpeaking(true);
-  stopMic();
-  setState('speaking');
+  log(`speak: ${audioB64 ? audioB64.length : 0} chars`);
+  setStatus('speaking');
 
-  const binary = atob(audioB64);
-  const bytes  = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  const blob  = new Blob([bytes], { type: 'audio/mpeg' });
-  const url   = URL.createObjectURL(blob);
-  // Always use the single shared audio element (keeps iOS gesture context)
-  const audio = sharedAudio;
-  audio.src = url;
+  const bytes = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
+  const url   = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
 
-  let doneCalled = false;
-  const done = () => {
-    if (doneCalled) return;
-    doneCalled = true;
+  let finished = false;
+  function onDone() {
+    if (finished) return;
+    finished = true;
     URL.revokeObjectURL(url);
-    setSpeaking(false);
-    micActive = false;
-    try { recognition && recognition.abort(); } catch(e) {}
-    log('audio ended — showing mic button');
-    setState('idle');
-    showBtn(true);
-  };
+    log('audio done — showing mic');
+    setStatus('idle');
+    showMic();  // ← step 9: mic appears after Natasha stops
+  }
 
-  audio.onended = done;
-  audio.onerror = (err) => { log(`audio error: ${err.type}`); done(); };
+  audio.onended = onDone;
+  audio.onerror = () => { log('audio error'); onDone(); };
+  audio.src = url;
   audio.play()
     .then(() => log('audio playing'))
-    .catch(err => { log(`audio play failed: ${err}`); done(); });
+    .catch(err => { log(`play failed: ${err}`); onDone(); });
 }
 
 // ── Greeting ─────────────────────────────────────────────────────
 async function greet() {
-  setState('thinking');
+  setStatus('thinking');
   try {
     const res  = await fetch(SERVER + '/chat', {
       method: 'POST',
@@ -295,20 +233,12 @@ async function greet() {
       body: JSON.stringify({ message: 'Поздоровайся с Фаиной — коротко и тепло. Одно предложение.', model: 'chat' })
     });
     const data = await res.json();
-    if (data.reply) {
-      const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
-      if (musicMatch) playMusic(musicMatch[1].trim());
-      speak(data.audio);
-    } else { setState('idle'); }
+    if (data.reply) speak(data.audio);
+    else { setStatus('idle'); showMic(); }
   } catch {
-    setState('idle');
-    showBtn(true);
+    setStatus('idle');
+    showMic();
   }
-}
-
-// ── Music ────────────────────────────────────────────────────────
-function playMusic(query) {
-  window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(query), '_blank');
 }
 
 // ── Init ─────────────────────────────────────────────────────────
@@ -321,12 +251,10 @@ window.addEventListener('load', () => {
     <div style="width:64px;height:64px;border-radius:50%;border:1px solid rgba(201,169,110,0.4);display:flex;align-items:center;justify-content:center;">
       <div style="width:20px;height:20px;border-radius:50%;background:#c9a96e;opacity:0.7;"></div>
     </div>`;
-  overlay.addEventListener('click', (e) => {
-    e.stopPropagation();
-    unlockAudio();
+  overlay.addEventListener('click', () => {
+    unlockAudio();   // create audio element inside gesture
     overlay.remove();
-    appReady = true;
-    log('overlay tapped — appReady=true, greeting…');
+    log('start tapped — greeting…');
     greet();
   });
   document.body.appendChild(overlay);
