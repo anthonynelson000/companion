@@ -264,7 +264,19 @@ async function greet() {
     const res  = await fetch(SERVER + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'Поздоровайся с Фаиной — коротко и тепло. Одно предложение.', model: 'chat' })
+      body: JSON.stringify({ message: (() => {
+        const now = new Date();
+        const hour = now.getHours();
+        const days = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+        const day = days[now.getDay()];
+        if (hour >= 5 && hour < 12)
+          return `Сейчас утро, сегодня ${day}. Поздоровайся с Фаиной по-утреннему — тепло и бодро. Одно предложение.`;
+        if (hour >= 12 && hour < 17)
+          return `Сейчас день, сегодня ${day}. Поздоровайся с Фаиной — тепло и по-дневному. Одно предложение.`;
+        if (hour >= 17 && hour < 21)
+          return `Сейчас вечер, сегодня ${day}. Поздоровайся с Фаиной по-вечернему — тепло и уютно. Одно предложение.`;
+        return `Сейчас поздний вечер, сегодня ${day}. Поздоровайся с Фаиной — тепло и спокойно. Одно предложение.`;
+      })(), model: 'chat' })
     });
     const data = await res.json();
     if (data.reply) speak(data.audio);

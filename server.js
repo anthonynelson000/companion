@@ -31,9 +31,34 @@ if (DATABASE_URL) {
       timestamp TIMESTAMPTZ DEFAULT NOW()
     )
   `).catch(console.error);
+  pgPool.query(`
+    CREATE TABLE IF NOT EXISTS faina_stories (
+      id        SERIAL PRIMARY KEY,
+      summary   TEXT NOT NULL,
+      timestamp TIMESTAMPTZ DEFAULT NOW()
+    )
+  `).catch(console.error);
   console.log('Using PostgreSQL database');
 } else {
   console.log('Using local JSON history');
+}
+
+async function loadStories() {
+  if (!pgPool) return '';
+  try {
+    const res = await pgPool.query('SELECT summary FROM faina_stories ORDER BY id ASC');
+    if (res.rows.length === 0) return '';
+    return '\n\nИСТОРИИ ИЗ ЖИЗНИ ФАИНЫ (запомни и используй в разговоре):\n' +
+      res.rows.map((r, i) => `${i+1}. ${r.summary}`).join('\n');
+  } catch { return ''; }
+}
+
+async function saveStory(summary) {
+  if (!pgPool) return;
+  try {
+    await pgPool.query('INSERT INTO faina_stories (summary) VALUES ($1)', [summary]);
+    console.log('Story saved:', summary.substring(0, 60));
+  } catch(e) { console.error('saveStory error:', e); }
 }
 
 async function loadHistory() {
@@ -193,10 +218,11 @@ app.post('/chat', async (req, res) => {
     const maxTok = wantsDetail ? 400 : 120;
 
     const work = async () => {
+      const stories = await loadStories();
       const params = {
         model: useModel,
         max_tokens: maxTok,
-        system: SYSTEM_PROMPT,
+        system: SYSTEM_PROMPT + stories,
         messages: history,
         tools: [{ type: "web_search_20250305", name: "web_search" }]
       };
@@ -225,6 +251,23 @@ app.post('/chat', async (req, res) => {
       if (!reply) return res.json({ reply: '' });
 
       await saveMessage('assistant', reply);
+
+      // Detect if Faina shared a personal story — ask Claude to summarize it
+      const storyKeywords = ['помню', 'когда я была', 'в детстве', 'в молодости', 'мой муж', 'моя семья', 
+        'мои дети', 'работала', 'жила', 'мы жили', 'была война', 'в советское', 'тогда было', 'раньше'];
+      const lastUserMsg = history[history.length - 1]?.content || '';
+      const looksLikeStory = storyKeywords.some(kw => lastUserMsg.toLowerCase().includes(kw)) && lastUserMsg.length > 80;
+      if (looksLikeStory) {
+        // Fire-and-forget story summarization
+        client.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 100,
+          messages: [{ role: 'user', content: `Summarize this personal memory from Faina in one short Russian sentence (max 20 words): "${lastUserMsg}"` }]
+        }).then(r => {
+          const summary = r.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+          if (summary) saveStory(summary);
+        }).catch(() => {});
+      }
 
       const BANNED_TOPICS = ['new york times', 'nyt', 'metropolitan', 'большой театр', 'мариинка', 'согласно', 'исследования показывают', 'эксперты говорят', 'важно отметить', 'вам следует', 'я рекомендую', 'я предлагаю'];
       const sentences = reply.split(/(?<=[.!?])\s+/);
