@@ -79,17 +79,23 @@ const SERVER = window.location.hostname === 'localhost' || window.location.proto
 
 const statusEl = document.getElementById('status');
 const errorEl  = document.getElementById('error');
+const waveEl   = document.querySelector('.waveform');
 
 // ── State ────────────────────────────────────────────────────────
 let isSpeaking    = false;
-let speakingTimer = null;   // 60s watchdog — force-resets if audio stalls
+let speakingTimer = null;
 let recognition   = null;
 let micActive     = false;
-let micEnabled    = false;
+let appReady      = false;
 
 function setState(state) {
   document.body.className = state;
-  const labels = { idle: '', listening: 'слушаю…', thinking: 'думаю…', speaking: 'говорю…' };
+  const labels = {
+    idle:      'нажмите чтобы говорить',
+    listening: 'слушаю…',
+    thinking:  'думаю…',
+    speaking:  'говорю…'
+  };
   statusEl.textContent = labels[state] || '';
 }
 
@@ -99,64 +105,65 @@ function showError(msg) {
   setTimeout(() => errorEl.style.display = 'none', 5000);
 }
 
-// ── Speaking flag with watchdog ───────────────────────────────────
-// Prevents permanent lockup if audio.onended never fires (iOS bug)
+// ── Speaking watchdog ─────────────────────────────────────────────
 function setSpeaking(val) {
   clearTimeout(speakingTimer);
   isSpeaking = val;
   if (val) {
     speakingTimer = setTimeout(() => {
       isSpeaking = false;
-      setState('listening');
-      restartMic();
+      setState('idle');
     }, 60000);
   }
 }
 
-// ── Mic ──────────────────────────────────────────────────────────
-// Rebuilt fresh each turn — avoids stale recognition state on iOS Safari
-function buildRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { showError('Используйте Chrome для распознавания речи.'); return null; }
-  const r = new SR();
-  r.lang           = 'ru-RU';
-  r.continuous     = false;   // single-shot: more stable on iOS
-  r.interimResults = false;   // final only: avoids double-sends
+// ── Single-shot mic — built fresh each time, started by user tap ──
+function startListening() {
+  if (!appReady || isSpeaking || micActive) return;
 
-  r.onstart  = () => { micActive = true; if (!isSpeaking) setState('listening'); };
-  r.onend    = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showError('Используйте Safari для голосового ввода.'); return; }
+
+  recognition = new SR();
+  recognition.lang           = 'ru-RU';
+  recognition.continuous     = false;
+  recognition.interimResults = false;
+
+  recognition.onstart  = () => { micActive = true; setState('listening'); };
+  recognition.onend    = () => { micActive = false; if (!isSpeaking) setState('idle'); };
+
+  recognition.onresult = (e) => {
     micActive = false;
-    // Auto-restart loop while mic is enabled and not speaking
-    if (micEnabled && !isSpeaking) setTimeout(restartMic, 300);
-  };
-  r.onresult = (e) => {
-    if (isSpeaking) return;
     const text = Array.from(e.results)
-      .filter(res => res.isFinal)
-      .map(res => res[0].transcript)
+      .filter(r => r.isFinal)
+      .map(r => r[0].transcript)
       .join(' ')
       .trim();
-    if (text.length > 2) sendToAI(text);
+    if (text.length > 1) sendToAI(text);
+    else setState('idle');
   };
-  r.onerror = (e) => {
-    micActive = false;
-    if (e.error === 'not-allowed') { showError('Разрешите доступ к микрофону.'); return; }
-    if (e.error === 'aborted') return;
-    if (micEnabled && !isSpeaking) setTimeout(restartMic, 800);
-  };
-  return r;
-}
 
-function restartMic() {
-  if (!micEnabled || isSpeaking || micActive) return;
-  recognition = buildRecognition();
-  if (recognition) try { recognition.start(); } catch(e) {}
+  recognition.onerror = (e) => {
+    micActive = false;
+    if (e.error === 'not-allowed') { showError('Разрешите доступ к микрофону в настройках Safari.'); return; }
+    if (e.error === 'no-speech')   { setState('idle'); return; }
+    setState('idle');
+  };
+
+  try { recognition.start(); } catch(e) { setState('idle'); }
 }
 
 function stopMic() {
   micActive = false;
   try { recognition && recognition.abort(); } catch(e) {}
 }
+
+// ── Tap anywhere to speak (except while speaking/thinking) ────────
+document.addEventListener('click', () => {
+  if (!appReady || isSpeaking || micActive) return;
+  if (document.body.classList.contains('thinking')) return;
+  startListening();
+});
 
 // ── AI call ──────────────────────────────────────────────────────
 async function sendToAI(userText) {
@@ -169,16 +176,15 @@ async function sendToAI(userText) {
       body: JSON.stringify({ message: userText, model: 'chat' })
     });
     const data = await res.json();
-    if (data.error) { showError('Ошибка: ' + data.error); setState('listening'); restartMic(); return; }
+    if (data.error) { showError('Ошибка: ' + data.error); setState('idle'); return; }
     if (data.reply) {
       const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
       if (musicMatch) playMusic(musicMatch[1].trim());
       speak(data.audio);
-    } else { setState('listening'); restartMic(); }
+    } else { setState('idle'); }
   } catch(err) {
     showError('Нет соединения с сервером.');
-    setState('listening');
-    restartMic();
+    setState('idle');
   }
 }
 
@@ -198,8 +204,7 @@ function speak(audioB64) {
   const done = () => {
     URL.revokeObjectURL(url);
     setSpeaking(false);
-    setState('listening');
-    setTimeout(restartMic, 800);
+    setState('idle');
   };
 
   audio.onended = done;
@@ -208,10 +213,7 @@ function speak(audioB64) {
 }
 
 // ── Greeting ─────────────────────────────────────────────────────
-let greeted = false;
 async function greet() {
-  if (greeted) return;
-  greeted = true;
   setState('thinking');
   try {
     const res  = await fetch(SERVER + '/chat', {
@@ -220,16 +222,13 @@ async function greet() {
       body: JSON.stringify({ message: 'Поздоровайся с Фаиной — коротко и тепло. Одно предложение.', model: 'chat' })
     });
     const data = await res.json();
-    micEnabled = true;
     if (data.reply) {
       const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
       if (musicMatch) playMusic(musicMatch[1].trim());
       speak(data.audio);
-    } else { setState('listening'); restartMic(); }
+    } else { setState('idle'); }
   } catch {
-    setState('listening');
-    micEnabled = true;
-    restartMic();
+    setState('idle');
   }
 }
 
@@ -250,7 +249,7 @@ window.addEventListener('load', () => {
     </div>`;
   overlay.addEventListener('click', () => {
     overlay.remove();
-    micEnabled = true;
+    appReady = true;
     greet();
   });
   document.body.appendChild(overlay);
