@@ -238,7 +238,7 @@ app.post('/translate', async (req, res) => {
 
 app.get('/history', async (req, res) => {
   const rows = pgPool
-    ? (await pgPool.query('SELECT role, content, timestamp FROM messages ORDER BY id ASC')).rows
+    ? (await pgPool.query('SELECT role, content, timestamp FROM messages ORDER BY id DESC')).rows
     : (() => { try { return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); } catch { return []; } })();
 
   const html = `<!DOCTYPE html>
