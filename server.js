@@ -291,7 +291,7 @@ ${(() => {
     const dataText = r.content.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/\[MUSIC:[^\]]*\]/g,'');
     out += `<div class="msg ${r.role}">
       <div class="label">${who}</div>
-      <div class="bubble" onclick="translate(this)" data-text="${dataText}" id="b${idx}">${display}</div>
+      <div class="bubble" onclick="translateMsg(this)" data-text="${dataText}" id="b${idx}">${display}</div>
       <div class="translation" id="t${idx}"></div>
       ${time ? `<div class="ts">${time}</div>` : ''}
     </div>`;
@@ -301,7 +301,7 @@ ${(() => {
 })()}
 <button class="clear-btn" onclick="if(confirm('Очистить всю историю?')){fetch('/clear',{method:'POST'}).then(()=>location.reload())}">Очистить историю</button>
 <script>
-async function translate(bubble) {
+async function translateMsg(bubble) {
   const text = bubble.dataset.text;
   const idx = bubble.id.replace('b','');
   const tDiv = document.getElementById('t' + idx);
