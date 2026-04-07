@@ -101,8 +101,8 @@ function showError(msg) {
 }
 
 // ── The only two functions that touch the mic button ─────────────
-function showMic()  { micBtn.classList.remove('disabled','listening'); micBtn.disabled = false; log('mic btn: GREEN (ready)'); }
-function hideMic()  { micBtn.classList.remove('listening'); micBtn.classList.add('disabled'); micBtn.disabled = false; log('mic btn: GREY (disabled)'); }
+function showMic()  { micBtn.classList.remove('disabled','listening'); log('mic btn: GREEN (ready)'); }
+function hideMic()  { micBtn.classList.remove('listening'); micBtn.classList.add('disabled'); log('mic btn: GREY (disabled)'); }
 
 // ── Visual state (never touches mic button) ──────────────────────
 function setStatus(state) {
@@ -123,17 +123,10 @@ function unlockAudio() {
 
 // ── Mic button event listeners ──────────────────────────────────
 micBtn.addEventListener('click', () => {
-  if (micBtn.classList.contains('disabled')) { log('mic blocked — disabled'); return; }
+  if (micBtn.classList.contains('disabled')) { log('mic blocked — grey'); return; }
   log('mic tapped');
-  micBtn.classList.add('listening');
-  hideMicInteraction();
   setTimeout(startListening, 300);
 });
-
-function hideMicInteraction() {
-  micBtn.disabled = true;
-  log('mic interaction started');
-}
 
 // ── Speech recognition ───────────────────────────────────────────
 let activeRec = null;
@@ -305,10 +298,15 @@ window.addEventListener('load', () => {
     <div style="width:64px;height:64px;border-radius:50%;border:1px solid rgba(201,169,110,0.4);display:flex;align-items:center;justify-content:center;">
       <div style="width:20px;height:20px;border-radius:50%;background:#c9a96e;opacity:0.7;"></div>
     </div>`;
-  overlay.addEventListener('click', () => {
-    unlockAudio();   // create audio element inside gesture
+  overlay.addEventListener('click', async () => {
+    unlockAudio();
     overlay.remove();
-    log('start tapped — greeting…');
+    log('start tapped — requesting mic permission…');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      log('mic permission granted upfront');
+    } catch(e) { log('mic permission issue: ' + e.message); }
     greet();
   });
   document.body.appendChild(overlay);
