@@ -55,7 +55,7 @@
   .mic-btn { margin-top: 24px; width: 200px; height: 200px; border-radius: 50%;
     border: 3px solid #444; background: rgba(255,255,255,0.03);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 10px; cursor: pointer; user-select: none; -webkit-user-select: none;
+    cursor: pointer; user-select: none; -webkit-user-select: none;
     touch-action: none; -webkit-tap-highlight-color: transparent;
     transition: border-color 0.2s, background 0.2s; }
   .mic-btn.listening { border-color: #e53935; background: rgba(229,57,53,0.10); }
@@ -65,7 +65,7 @@
   .mic-btn:not(.disabled):not(.listening) .mic-icon path { fill: #4caf50; }
   .mic-btn.listening .mic-icon path { fill: #e53935; }
   .mic-btn.disabled .mic-icon path { fill: #444; }
-  .mic-label { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-style: italic;
+  .mic-label { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-style: italic;
     letter-spacing: 0.04em; color: #444; transition: color 0.2s; text-align: center; line-height: 1.2; }
   .mic-btn:not(.disabled):not(.listening) .mic-label { color: #4caf50; }
   .mic-btn.listening .mic-label { color: #e53935; }
@@ -82,12 +82,6 @@
 </div>
 <div class="status" id="status"></div>
 <button id="micBtn" class="mic-btn disabled">
-  <svg class="mic-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M16 3C14.3 3 13 4.3 13 6v10c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z"/>
-    <path d="M8 14c0 4.4 3.6 8 8 8s8-3.6 8-8" stroke-width="2" stroke-linecap="round" fill="none"/>
-    <line x1="16" y1="22" x2="16" y2="27" stroke-width="2" stroke-linecap="round"/>
-    <line x1="12" y1="27" x2="20" y2="27" stroke-width="2" stroke-linecap="round"/>
-  </svg>
   <span class="mic-label" id="micLabel">держите</span>
 </button>
 <div class="error-banner" id="errorBanner"></div>
