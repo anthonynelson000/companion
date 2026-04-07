@@ -195,12 +195,14 @@ function getMusicQuery(text) {
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No audio' });
   try {
+    const { toFile } = require('openai');
+    const file = await toFile(req.file.buffer, 'recording.webm', { type: req.file.mimetype });
     const response = await openai.audio.transcriptions.create({
-      file: new File([req.file.buffer], 'recording.webm', { type: req.file.mimetype }),
+      file,
       model: 'whisper-1',
       language: 'ru'
     });
-    log && log('transcribed: ' + response.text);
+    console.log('transcribed:', response.text);
     res.json({ text: response.text });
   } catch(err) {
     console.error('Whisper error:', err);
