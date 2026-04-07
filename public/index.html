@@ -60,13 +60,13 @@
     transition: border-color 0.2s, background 0.2s; }
   .mic-btn.listening { border-color: #e53935; background: rgba(229,57,53,0.10); }
   .mic-btn:not(.disabled):not(.listening) { border-color: #4caf50; background: rgba(76,175,80,0.08); }
-  .mic-icon { width: 56px; height: 56px; }
+  .mic-icon { width: 40px; height: 40px; }
   .mic-icon path { fill: #444; }
   .mic-btn:not(.disabled):not(.listening) .mic-icon path { fill: #4caf50; }
   .mic-btn.listening .mic-icon path { fill: #e53935; }
   .mic-btn.disabled .mic-icon path { fill: #444; }
-  .mic-label { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-style: italic;
-    letter-spacing: 0.06em; color: #444; transition: color 0.2s; }
+  .mic-label { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-style: italic;
+    letter-spacing: 0.04em; color: #444; transition: color 0.2s; text-align: center; line-height: 1.2; }
   .mic-btn:not(.disabled):not(.listening) .mic-label { color: #4caf50; }
   .mic-btn.listening .mic-label { color: #e53935; }
   .mic-btn.disabled .mic-label { color: #444; }
@@ -91,7 +91,7 @@
   <span class="mic-label" id="micLabel">держите</span>
 </button>
 <div class="error-banner" id="errorBanner"></div>
-<div id="debug" style="position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;max-height:160px;overflow-y:auto;z-index:999;"></div>
+<div id="debug" style="display:none;"></div>
 
 <script>
 const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
@@ -117,7 +117,7 @@ function showError(msg) {
 // ── The only two functions that touch the mic button ─────────────
 function showMic()  {
   micBtn.classList.remove('disabled','listening');
-  document.getElementById('micLabel').textContent = 'держите';
+  document.getElementById('micLabel').innerHTML = 'держите';
   log('mic btn: GREEN (ready)');
 }
 function hideMic()  {
