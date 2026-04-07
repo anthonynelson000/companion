@@ -124,7 +124,7 @@ function unlockAudio() {
 function onMicTap() {
   log('mic tapped');
   hideMic();
-  setTimeout(startListening, 300);
+  setTimeout(startListening, 800);
 }
 
 // ── Speech recognition ───────────────────────────────────────────
@@ -174,25 +174,23 @@ function startListening() {
     }
   };
 
+  let errorHandled = false;
   rec.onerror = (e) => {
     log(`mic error: ${e.error}`);
     if (e.error === 'not-allowed') {
       showError('Разрешите доступ к микрофону в настройках Safari.');
-    }
-    // For audio-capture/aborted, retry once after a short delay
-    if (e.error === 'audio-capture' || e.error === 'aborted') {
-      log('mic busy — retrying in 600ms');
-      setTimeout(() => { setStatus('idle'); showMic(); }, 600);
+      errorHandled = true;
       return;
     }
+    errorHandled = true;
     setStatus('idle');
-    showMic();
+    setTimeout(() => showMic(), 1000);
   };
 
   rec.onend = () => {
     clearTimeout(silenceTimer);
     log(`rec ended — gotResult:${gotResult} state:${document.body.className}`);
-    // Show mic if no result was processed (timeout, no speech detected, etc)
+    if (errorHandled) return; // onerror already handled it
     if (!gotResult && document.body.className !== 'thinking' && document.body.className !== 'speaking') {
       setStatus('idle');
       showMic();
