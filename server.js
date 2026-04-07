@@ -3,6 +3,7 @@ const multer    = require('multer');
 const OpenAI    = require('openai');
 const upload    = multer({ storage: multer.memoryStorage() });
 const openai    = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
+const { toFile } = require('openai');
 const cors      = require('cors');
 const path      = require('path');
 const https     = require('https');
@@ -195,14 +196,13 @@ function getMusicQuery(text) {
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No audio' });
   try {
-    const { toFile } = require('openai');
     const file = await toFile(req.file.buffer, 'recording.webm', { type: req.file.mimetype });
     const response = await openai.audio.transcriptions.create({
       file,
       model: 'whisper-1',
       language: 'ru'
     });
-    console.log('transcribed:', response.text);
+    console.log('whisper response:', JSON.stringify(response));
     res.json({ text: response.text });
   } catch(err) {
     console.error('Whisper error:', err);
