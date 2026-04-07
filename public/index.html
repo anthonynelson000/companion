@@ -49,34 +49,15 @@
     letter-spacing: 0.18em; color: rgba(201,169,110,0.5); text-transform: uppercase; }
   .status { margin-top: 32px; font-size: 1.4rem; font-weight: 300; font-style: italic;
     color: var(--muted); letter-spacing: 0.04em; height: 1.6em; text-align: center; transition: color 0.4s; }
-  .error-banner { display: none; position: fixed; bottom: 200px; left: 50%; transform: translateX(-50%);
+  .error-banner { display: none; position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
     background: rgba(180,60,60,0.85); color: #fff; padding: 14px 28px; border-radius: 10px;
-    font-size: 1.1rem; text-align: center; max-width: 320px; z-index: 10; }
-  .mic-btn {
-    margin-top: 40px; width: 160px; height: 160px; border-radius: 50%;
-    border: 3px solid #4caf50; background: rgba(76,175,80,0.08);
+    font-size: 1.1rem; text-align: center; max-width: 320px; }
+  .mic-btn { margin-top: 40px; width: 160px; height: 160px; border-radius: 50%;
+    border: 2px solid rgba(201,169,110,0.5); background: rgba(201,169,110,0.06);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
-    transition: border-color 0.2s, background 0.2s, transform 0.1s;
-    -webkit-tap-highlight-color: transparent;
-    touch-action: none;
-  }
-  .mic-btn.recording {
-    border-color: #e53935;
-    background: rgba(229,57,53,0.12);
-    transform: scale(1.06);
-  }
-  .mic-btn.disabled {
-    border-color: #444;
-    background: rgba(255,255,255,0.03);
-    cursor: default;
-    pointer-events: none;
-  }
+    transition: border-color 0.3s, background 0.3s; -webkit-tap-highlight-color: transparent; }
   .mic-icon { width: 64px; height: 64px; }
-  .mic-icon path { fill: #4caf50; }
-  .mic-btn.recording .mic-icon path { fill: #e53935; }
-  .mic-btn.disabled .mic-icon path { fill: #444; }
-  .hold-hint { margin-top: 12px; font-size: 1rem; color: rgba(201,169,110,0.35);
-    font-style: italic; letter-spacing: 0.05em; }
+  .mic-icon path { fill: rgba(201,169,110,0.7); }
 </style>
 </head>
 <body class="idle">
@@ -88,25 +69,24 @@
   <div class="bar"></div>
 </div>
 <div class="status" id="status"></div>
-<button id="micBtn" class="mic-btn disabled">
+<button id="micBtn" class="mic-btn" style="visibility:hidden;" onclick="onMicTap()">
   <svg class="mic-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M16 3C14.3 3 13 4.3 13 6v10c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z"/>
     <path d="M8 14c0 4.4 3.6 8 8 8s8-3.6 8-8" stroke-width="2" stroke-linecap="round" fill="none"/>
     <line x1="16" y1="22" x2="16" y2="27" stroke-width="2" stroke-linecap="round"/>
-    <line x1="12" y1="27" x2="20" y2="27" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="27" x2="20" y2="27" stroke-width="2" stroke-linecent="round"/>
   </svg>
 </button>
-<div class="hold-hint" id="holdHint" style="visibility:hidden;">нажмите и держите чтобы говорить</div>
+<div class="hold-hint" id="holdHint">нажмите микрофон чтобы говорить</div>
 <div class="error-banner" id="errorBanner"></div>
 <div id="debug" style="position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;max-height:160px;overflow-y:auto;z-index:999;"></div>
 
 <script>
-const SERVER   = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
+const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
 const statusEl = document.getElementById('status');
 const errorEl  = document.getElementById('errorBanner');
 const debugEl  = document.getElementById('debug');
 const micBtn   = document.getElementById('micBtn');
-const holdHint = document.getElementById('holdHint');
 
 function log(msg) {
   const t = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -120,115 +100,107 @@ function showError(msg) {
   setTimeout(() => errorEl.style.display = 'none', 5000);
 }
 
-function showMic() {
-  micBtn.classList.remove('disabled', 'recording');
-  micBtn.disabled = false;
-  holdHint.style.visibility = 'visible';
-  log('mic btn: GREEN (ready)');
-}
-function hideMic() {
-  micBtn.classList.remove('recording');
-  micBtn.classList.add('disabled');
-  micBtn.disabled = true;
-  holdHint.style.visibility = 'hidden';
-  log('mic btn: GREY (disabled)');
-}
+// ── The only two functions that touch the mic button ─────────────
+function showMic()  { micBtn.style.visibility = 'visible'; micBtn.disabled = false; log('mic btn: SHOW'); }
+function hideMic()  { micBtn.style.visibility = 'hidden';  micBtn.disabled = true;  log('mic btn: HIDE'); }
 
+// ── Visual state (never touches mic button) ──────────────────────
 function setStatus(state) {
   document.body.className = state;
-  statusEl.textContent = { idle:'', listening:'слушаю…', thinking:'думаю…', speaking:'говорю…' }[state] || '';
+  statusEl.textContent = { idle:'нажмите микрофон', listening:'слушаю…', thinking:'думаю…', speaking:'говорю…' }[state] || '';
 }
 
-// ── Audio playback ───────────────────────────────────────────────
+// ── Audio (single shared element, created on first tap) ──────────
 let audio = null;
+
 function unlockAudio() {
+  // Must be called inside a user gesture so iOS allows playback
   audio = new Audio();
   audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
   audio.play().catch(() => {});
-  log('audio unlocked');
+  log('audio element created and unlocked');
 }
 
-// ── MediaRecorder (press and hold) ──────────────────────────────
-let mediaRecorder = null;
-let audioChunks   = [];
-let mediaStream   = null;
-let isRecording   = false;
+// ── Mic tap handler ──────────────────────────────────────────────
+function onMicTap() {
+  log('mic tapped');
+  hideMic();
+  setTimeout(startListening, 800);
+}
 
-async function startRecording() {
-  if (isRecording) return;
-  log('press — starting recording');
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    audioChunks = [];
-    mediaRecorder = new MediaRecorder(mediaStream);
-    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-    mediaRecorder.start();
-    isRecording = true;
-    micBtn.classList.add('recording');
-    setStatus('listening');
-    log('recording started');
-  } catch(e) {
-    log(`mic error: ${e.message}`);
-    showError('Разрешите доступ к микрофону в настройках.');
-    showMic();
+// ── Speech recognition ───────────────────────────────────────────
+let activeRec = null;
+
+function startListening() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showError('Используйте Safari для голосового ввода.'); showMic(); return; }
+
+  // Kill any previous session before starting a new one
+  if (activeRec) {
+    try { activeRec.abort(); } catch(e) {}
+    activeRec = null;
   }
-}
 
-function stopRecording() {
-  if (!isRecording || !mediaRecorder) return;
-  log('release — stopping recording');
-  isRecording = false;
-  micBtn.classList.remove('recording');
+  const rec = new SR();
+  activeRec = rec;
+  rec.lang           = 'ru-RU';
+  rec.continuous     = false;
+  rec.interimResults = false;
 
-  mediaRecorder.onstop = async () => {
-    // Stop all tracks to fully release mic
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-
-    const blob = new Blob(audioChunks, { type: 'audio/webm' });
-    log(`audio blob: ${blob.size} bytes`);
-
-    if (blob.size < 3000) {
-      log('too short — likely permission dialog interrupted, resetting');
-      setStatus('idle');
-      showMic();
-      return;
-    }
-
-    setStatus('thinking');
-    await sendAudioToServer(blob);
+  let silenceTimer = null;
+  let gotResult = false;
+  rec.onstart = () => {
+    setStatus('listening');
+    log('listening…');
+    silenceTimer = setTimeout(() => {
+      log('silence timeout — forcing stop');
+      try { rec.stop(); } catch(e) {}
+    }, 8000);
   };
 
-  mediaRecorder.stop();
-}
-
-async function sendAudioToServer(blob) {
-  try {
-    const formData = new FormData();
-    formData.append('audio', blob, 'recording.webm');
-    const res  = await fetch(SERVER + '/transcribe', { method: 'POST', body: formData });
-    const data = await res.json();
-    log(`transcribed: "${data.text}"`);
-    if (!data.text || data.text.trim().length < 2) {
-      log('no speech detected');
+  rec.onresult = (e) => {
+    gotResult = true;
+    clearTimeout(silenceTimer);
+    const text = Array.from(e.results)
+      .filter(r => r.isFinal)
+      .map(r => r[0].transcript)
+      .join(' ').trim();
+    log(`heard: "${text}"`);
+    if (text.length > 1) {
+      setStatus('thinking');
+      sendToAI(text);
+    } else {
       setStatus('idle');
       showMic();
+    }
+  };
+
+  let errorHandled = false;
+  rec.onerror = (e) => {
+    log(`mic error: ${e.error}`);
+    if (e.error === 'not-allowed') {
+      showError('Разрешите доступ к микрофону в настройках Safari.');
+      errorHandled = true;
       return;
     }
-    await sendToAI(data.text.trim());
-  } catch(err) {
-    log(`transcribe error: ${err}`);
-    showError('Ошибка распознавания.');
+    errorHandled = true;
     setStatus('idle');
-    showMic();
-  }
-}
+    setTimeout(() => showMic(), 1000);
+  };
 
-// ── Press and hold event listeners ──────────────────────────────
-micBtn.addEventListener('mousedown',  e => { e.preventDefault(); startRecording(); });
-micBtn.addEventListener('touchstart', e => { e.preventDefault(); startRecording(); }, { passive: false });
-micBtn.addEventListener('mouseup',    e => { e.preventDefault(); stopRecording(); });
-micBtn.addEventListener('mouseleave', e => { if (isRecording) stopRecording(); });
-micBtn.addEventListener('touchend',   e => { e.preventDefault(); stopRecording(); }, { passive: false });
+  rec.onend = () => {
+    clearTimeout(silenceTimer);
+    log(`rec ended — gotResult:${gotResult} state:${document.body.className}`);
+    if (errorHandled) return; // onerror already handled it
+    if (!gotResult && document.body.className !== 'thinking' && document.body.className !== 'speaking') {
+      setStatus('idle');
+      showMic();
+    }
+  };
+
+  try { rec.start(); log('rec.start()'); }
+  catch(e) { log(`rec.start failed: ${e}`); setStatus('idle'); showMic(); }
+}
 
 // ── Send to AI ───────────────────────────────────────────────────
 async function sendToAI(text) {
@@ -244,8 +216,9 @@ async function sendToAI(text) {
     if (data.reply) {
       const musicMatch = data.reply.match(/\[MUSIC:\s*([^\]]+)\]/);
       if (musicMatch) {
-        log(`opening music: ${musicMatch[1].trim()}`);
-        window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(musicMatch[1].trim()), '_blank');
+        const query = musicMatch[1].trim();
+        log(`opening music: ${query}`);
+        window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(query), '_blank');
       }
       speak(data.audio);
     } else { setStatus('idle'); showMic(); }
@@ -261,8 +234,10 @@ async function sendToAI(text) {
 function speak(audioB64) {
   log(`speak: ${audioB64 ? audioB64.length : 0} chars`);
   setStatus('speaking');
+
   const bytes = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
   const url   = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }));
+
   let finished = false;
   function onDone() {
     if (finished) return;
@@ -270,36 +245,45 @@ function speak(audioB64) {
     URL.revokeObjectURL(url);
     log('audio done — showing mic');
     setStatus('idle');
-    showMic();
+    showMic();  // ← step 9: mic appears after Natasha stops
   }
+
   audio.onended = onDone;
   audio.onerror = () => { log('audio error'); onDone(); };
   audio.src = url;
-  audio.play().then(() => log('audio playing')).catch(err => { log(`play failed: ${err}`); onDone(); });
+  audio.play()
+    .then(() => log('audio playing'))
+    .catch(err => { log(`play failed: ${err}`); onDone(); });
 }
 
 // ── Greeting ─────────────────────────────────────────────────────
 async function greet() {
   setStatus('thinking');
   try {
-    const now  = new Date();
-    const hour = now.getHours();
-    const days = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
-    const day  = days[now.getDay()];
-    let msg;
-    if (hour >= 5 && hour < 12)       msg = `Сейчас утро, сегодня ${day}. Поздоровайся с Фаиной по-утреннему — тепло и бодро. Одно предложение.`;
-    else if (hour >= 12 && hour < 17) msg = `Сейчас день, сегодня ${day}. Поздоровайся с Фаиной — тепло и по-дневному. Одно предложение.`;
-    else if (hour >= 17 && hour < 21) msg = `Сейчас вечер, сегодня ${day}. Поздоровайся с Фаиной по-вечернему — тепло и уютно. Одно предложение.`;
-    else                               msg = `Сейчас поздний вечер, сегодня ${day}. Поздоровайся с Фаиной — тепло и спокойно. Одно предложение.`;
-
     const res  = await fetch(SERVER + '/chat', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, model: 'chat' })
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: (() => {
+        const now = new Date();
+        const hour = now.getHours();
+        const days = ['воскресенье','понедельник','вторник','среду','четверг','пятницу','субботу'];
+        const day = days[now.getDay()];
+        if (hour >= 5 && hour < 12)
+          return `Сейчас утро, сегодня ${day}. Поздоровайся с Фаиной по-утреннему — тепло и бодро. Одно предложение.`;
+        if (hour >= 12 && hour < 17)
+          return `Сейчас день, сегодня ${day}. Поздоровайся с Фаиной — тепло и по-дневному. Одно предложение.`;
+        if (hour >= 17 && hour < 21)
+          return `Сейчас вечер, сегодня ${day}. Поздоровайся с Фаиной по-вечернему — тепло и уютно. Одно предложение.`;
+        return `Сейчас поздний вечер, сегодня ${day}. Поздоровайся с Фаиной — тепло и спокойно. Одно предложение.`;
+      })(), model: 'chat' })
     });
     const data = await res.json();
     if (data.reply) speak(data.audio);
     else { setStatus('idle'); showMic(); }
-  } catch { setStatus('idle'); showMic(); }
+  } catch {
+    setStatus('idle');
+    showMic();
+  }
 }
 
 // ── Init ─────────────────────────────────────────────────────────
@@ -312,19 +296,10 @@ window.addEventListener('load', () => {
     <div style="width:64px;height:64px;border-radius:50%;border:1px solid rgba(201,169,110,0.4);display:flex;align-items:center;justify-content:center;">
       <div style="width:20px;height:20px;border-radius:50%;background:#c9a96e;opacity:0.7;"></div>
     </div>`;
-  overlay.addEventListener('click', async () => {
-    unlockAudio();
+  overlay.addEventListener('click', () => {
+    unlockAudio();   // create audio element inside gesture
     overlay.remove();
-    log('start tapped — requesting mic permission…');
-    // Request mic permission NOW during the tap gesture, before Faina needs it
-    // This way the Safari dialog appears at startup, not mid-conversation
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop()); // release immediately
-      log('mic permission granted');
-    } catch(e) {
-      log('mic permission denied or unavailable');
-    }
+    log('start tapped — greeting…');
     greet();
   });
   document.body.appendChild(overlay);

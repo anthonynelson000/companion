@@ -1,9 +1,4 @@
 const express   = require('express');
-const multer    = require('multer');
-const OpenAI    = require('openai');
-const upload    = multer({ storage: multer.memoryStorage() });
-const openai    = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
-const { toFile } = require('openai');
 const cors      = require('cors');
 const path      = require('path');
 const https     = require('https');
@@ -191,24 +186,6 @@ function getMusicQuery(text) {
   if (t.includes('опера') || t.includes('opera')) return 'Russian opera Bolshoi';
   return 'Russian classical music opera Tchaikovsky Rachmaninoff';
 }
-
-// ── Whisper transcription ────────────────────────────────────────
-app.post('/transcribe', upload.single('audio'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No audio' });
-  try {
-    const file = await toFile(req.file.buffer, 'recording.webm', { type: req.file.mimetype });
-    const response = await openai.audio.transcriptions.create({
-      file,
-      model: 'whisper-1',
-      language: 'ru'
-    });
-    console.log('whisper response:', JSON.stringify(response));
-    res.json({ text: response.text });
-  } catch(err) {
-    console.error('Whisper error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 app.post('/chat', async (req, res) => {
   const { message, model = 'chat' } = req.body;
