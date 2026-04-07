@@ -78,7 +78,7 @@
   </svg>
 </button>
 <div class="error-banner" id="errorBanner"></div>
-<div id="debug" style="display:none;"></div>
+<div id="debug" style="position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:8px;max-height:160px;overflow-y:auto;z-index:999;"></div>
 
 <script>
 const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
