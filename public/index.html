@@ -187,15 +187,14 @@ function stopRecording() {
     const blob = new Blob(audioChunks, { type: 'audio/webm' });
     log(`audio blob: ${blob.size} bytes`);
 
-    if (blob.size < 1000) {
-      log('too short — ignoring');
+    if (blob.size < 3000) {
+      log('too short — likely permission dialog interrupted, resetting');
       setStatus('idle');
       showMic();
       return;
     }
 
     setStatus('thinking');
-    hideMic();
     await sendAudioToServer(blob);
   };
 
@@ -313,10 +312,19 @@ window.addEventListener('load', () => {
     <div style="width:64px;height:64px;border-radius:50%;border:1px solid rgba(201,169,110,0.4);display:flex;align-items:center;justify-content:center;">
       <div style="width:20px;height:20px;border-radius:50%;background:#c9a96e;opacity:0.7;"></div>
     </div>`;
-  overlay.addEventListener('click', () => {
+  overlay.addEventListener('click', async () => {
     unlockAudio();
     overlay.remove();
-    log('start tapped — greeting…');
+    log('start tapped — requesting mic permission…');
+    // Request mic permission NOW during the tap gesture, before Faina needs it
+    // This way the Safari dialog appears at startup, not mid-conversation
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop()); // release immediately
+      log('mic permission granted');
+    } catch(e) {
+      log('mic permission denied or unavailable');
+    }
     greet();
   });
   document.body.appendChild(overlay);
