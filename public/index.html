@@ -54,20 +54,27 @@
     font-size: 1.1rem; text-align: center; max-width: 320px; z-index: 10; }
   .mic-btn {
     margin-top: 40px; width: 160px; height: 160px; border-radius: 50%;
-    border: 2px solid rgba(201,169,110,0.5); background: rgba(201,169,110,0.06);
+    border: 3px solid #4caf50; background: rgba(76,175,80,0.08);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
     transition: border-color 0.2s, background 0.2s, transform 0.1s;
     -webkit-tap-highlight-color: transparent;
     touch-action: none;
   }
   .mic-btn.recording {
-    border-color: var(--blue);
-    background: rgba(106,180,232,0.15);
-    transform: scale(1.08);
+    border-color: #e53935;
+    background: rgba(229,57,53,0.12);
+    transform: scale(1.06);
+  }
+  .mic-btn.disabled {
+    border-color: #444;
+    background: rgba(255,255,255,0.03);
+    cursor: default;
+    pointer-events: none;
   }
   .mic-icon { width: 64px; height: 64px; }
-  .mic-icon path { fill: rgba(201,169,110,0.7); }
-  .mic-btn.recording .mic-icon path { fill: var(--blue); }
+  .mic-icon path { fill: #4caf50; }
+  .mic-btn.recording .mic-icon path { fill: #e53935; }
+  .mic-btn.disabled .mic-icon path { fill: #444; }
   .hold-hint { margin-top: 12px; font-size: 1rem; color: rgba(201,169,110,0.35);
     font-style: italic; letter-spacing: 0.05em; }
 </style>
@@ -81,7 +88,7 @@
   <div class="bar"></div>
 </div>
 <div class="status" id="status"></div>
-<button id="micBtn" class="mic-btn" style="visibility:hidden;">
+<button id="micBtn" class="mic-btn disabled">
   <svg class="mic-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M16 3C14.3 3 13 4.3 13 6v10c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z"/>
     <path d="M8 14c0 4.4 3.6 8 8 8s8-3.6 8-8" stroke-width="2" stroke-linecap="round" fill="none"/>
@@ -113,17 +120,18 @@ function showError(msg) {
   setTimeout(() => errorEl.style.display = 'none', 5000);
 }
 
-function showMic()  {
-  micBtn.style.visibility = 'visible';
+function showMic() {
+  micBtn.classList.remove('disabled', 'recording');
   micBtn.disabled = false;
   holdHint.style.visibility = 'visible';
-  log('mic btn: SHOW');
+  log('mic btn: GREEN (ready)');
 }
-function hideMic()  {
-  micBtn.style.visibility = 'hidden';
+function hideMic() {
+  micBtn.classList.remove('recording');
+  micBtn.classList.add('disabled');
   micBtn.disabled = true;
   holdHint.style.visibility = 'hidden';
-  log('mic btn: HIDE');
+  log('mic btn: GREY (disabled)');
 }
 
 function setStatus(state) {
