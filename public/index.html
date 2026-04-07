@@ -55,8 +55,9 @@
   .mic-btn { margin-top: 24px; width: 200px; height: 200px; border-radius: 50%;
     border: 3px solid #444; background: rgba(255,255,255,0.03);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 10px; cursor: pointer;
-    transition: border-color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; }
+    gap: 10px; cursor: pointer; user-select: none; -webkit-user-select: none;
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.2s, background 0.2s; }
   .mic-btn.listening { border-color: #e53935; background: rgba(229,57,53,0.10); }
   .mic-btn:not(.disabled):not(.listening) { border-color: #4caf50; background: rgba(76,175,80,0.08); }
   .mic-icon { width: 56px; height: 56px; }
@@ -142,11 +143,25 @@ function unlockAudio() {
 }
 
 // ── Mic button event listeners ──────────────────────────────────
-micBtn.addEventListener('click', () => {
+function onMicPress(e) {
+  e.preventDefault();
   if (micBtn.classList.contains('disabled')) { log('mic blocked — grey'); return; }
-  log('mic tapped');
-  setTimeout(startListening, 300);
-});
+  log('mic pressed');
+  startListening();
+}
+function onMicRelease(e) {
+  e.preventDefault();
+  log('mic released');
+  if (activeRec) {
+    try { activeRec.stop(); } catch(e2) {}
+  }
+}
+
+micBtn.addEventListener('touchstart', onMicPress, { passive: false });
+micBtn.addEventListener('touchend',   onMicRelease, { passive: false });
+micBtn.addEventListener('mousedown',  onMicPress);
+micBtn.addEventListener('mouseup',    onMicRelease);
+micBtn.addEventListener('mouseleave', (e) => { if (e.buttons > 0) onMicRelease(e); });
 
 // ── Speech recognition ───────────────────────────────────────────
 let activeRec = null;
@@ -167,7 +182,6 @@ function startListening() {
   rec.continuous     = false;
   rec.interimResults = false;
 
-  let silenceTimer = null;
   let gotResult = false;
   rec.onstart = () => {
     setStatus('listening');
@@ -175,10 +189,6 @@ function startListening() {
     micBtn.classList.remove('disabled');
     document.getElementById('micLabel').textContent = 'слушаю';
     log('listening… RED');
-    silenceTimer = setTimeout(() => {
-      log('silence timeout — forcing stop');
-      try { rec.stop(); } catch(e) {}
-    }, 8000);
   };
 
   rec.onresult = (e) => {
@@ -212,10 +222,9 @@ function startListening() {
   };
 
   rec.onend = () => {
-    clearTimeout(silenceTimer);
     log(`rec ended — gotResult:${gotResult} state:${document.body.className}`);
-    if (errorHandled) return; // onerror already handled it
-    if (!gotResult && document.body.className !== 'thinking' && document.body.className !== 'speaking') {
+    if (errorHandled) return;
+    if (document.body.className !== 'thinking' && document.body.className !== 'speaking') {
       setStatus('idle');
       showMic();
     }
