@@ -95,6 +95,7 @@
 
 <script>
 const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
+const OPENAI_KEY = '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';
 const statusEl = document.getElementById('status');
 const errorEl  = document.getElementById('errorBanner');
 const debugEl  = document.getElementById('debug');
@@ -152,9 +153,7 @@ function onMicPress(e) {
 function onMicRelease(e) {
   e.preventDefault();
   log('mic released');
-  if (activeRec) {
-    try { activeRec.stop(); } catch(e2) {}
-  }
+  stopListening();
 }
 
 micBtn.addEventListener('touchstart', onMicPress, { passive: false });
@@ -163,75 +162,81 @@ micBtn.addEventListener('mousedown',  onMicPress);
 micBtn.addEventListener('mouseup',    onMicRelease);
 micBtn.addEventListener('mouseleave', (e) => { if (e.buttons > 0) onMicRelease(e); });
 
-// ── Speech recognition ───────────────────────────────────────────
-let activeRec = null;
+// ── MediaRecorder + OpenAI Whisper (client-side) ────────────────
+let mediaRecorder = null;
+let audioChunks   = [];
+let mediaStream   = null;
+let isRecording   = false;
 
 function startListening() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { showError('Используйте Safari для голосового ввода.'); showMic(); return; }
-
-  // Kill any previous session before starting a new one
-  if (activeRec) {
-    try { activeRec.abort(); } catch(e) {}
-    activeRec = null;
-  }
-
-  const rec = new SR();
-  activeRec = rec;
-  rec.lang           = 'ru-RU';
-  rec.continuous     = false;
-  rec.interimResults = false;
-
-  let gotResult = false;
-  rec.onstart = () => {
-    setStatus('listening');
-    micBtn.classList.add('listening');
-    micBtn.classList.remove('disabled');
-    document.getElementById('micLabel').textContent = 'слушаю';
-    log('listening… RED');
-  };
-
-  rec.onresult = (e) => {
-    gotResult = true;
-    clearTimeout(silenceTimer);
-    const text = Array.from(e.results)
-      .filter(r => r.isFinal)
-      .map(r => r[0].transcript)
-      .join(' ').trim();
-    log(`heard: "${text}"`);
-    if (text.length > 1) {
-      setStatus('thinking');
-      sendToAI(text);
-    } else {
-      setStatus('idle');
+  if (isRecording) return;
+  log('starting MediaRecorder…');
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      mediaStream   = stream;
+      audioChunks   = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.start();
+      isRecording = true;
+      micBtn.classList.add('listening');
+      micBtn.classList.remove('disabled');
+      document.getElementById('micLabel').textContent = 'слушаю';
+      setStatus('listening');
+      log('recording… RED');
+    })
+    .catch(e => {
+      log('mic error: ' + e.message);
+      showError('Разрешите доступ к микрофону.');
       showMic();
+    });
+}
+
+function stopListening() {
+  if (!isRecording || !mediaRecorder) return;
+  isRecording = false;
+  log('stopping recording…');
+
+  mediaRecorder.onstop = async () => {
+    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+    log(`blob: ${blob.size} bytes`);
+
+    if (blob.size < 3000) {
+      log('too short — ignoring');
+      setStatus('idle'); showMic(); return;
+    }
+
+    setStatus('thinking');
+    hideMic();
+
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'audio.webm');
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'ru');
+
+      const res  = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${OPENAI_KEY}` },
+        body: formData
+      });
+      const data = await res.json();
+      const text = data.text?.trim();
+      log(`transcribed: "${text}"`);
+
+      if (!text || text.length < 2) {
+        log('nothing heard'); setStatus('idle'); showMic(); return;
+      }
+      await sendToAI(text);
+    } catch(err) {
+      log('whisper error: ' + err);
+      showError('Ошибка распознавания.');
+      setStatus('idle'); showMic();
     }
   };
 
-  let errorHandled = false;
-  rec.onerror = (e) => {
-    log(`mic error: ${e.error}`);
-    if (e.error === 'not-allowed') {
-      showError('Разрешите доступ к микрофону в настройках Safari.');
-      errorHandled = true;
-      return;
-    }
-    errorHandled = true;
-    setStatus('idle');
-    setTimeout(() => showMic(), 1000);
-  };
-
-  rec.onend = () => {
-    log(`rec ended — gotResult:${gotResult} state:${document.body.className}`);
-    if (errorHandled) return;
-    if (document.body.className !== 'thinking' && document.body.className !== 'speaking') {
-      setStatus('idle');
-      showMic();
-    }
-  };
-
-  try { rec.start(); log('rec.start()'); }
-  catch(e) { log(`rec.start failed: ${e}`); setStatus('idle'); showMic(); }
+  mediaRecorder.stop();
 }
 
 // ── Send to AI ───────────────────────────────────────────────────
