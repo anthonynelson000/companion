@@ -223,6 +223,7 @@ function stopListening() {
         body: formData
       });
       const data = await res.json();
+      log(`whisper raw: ${JSON.stringify(data).substring(0,120)}`);
       const text = data.text?.trim();
       log(`transcribed: "${text}"`);
 
