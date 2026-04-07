@@ -95,7 +95,8 @@
 
 <script>
 const SERVER = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
-const OPENAI_KEY = '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';
+let OPENAI_KEY = null;
+fetch(SERVER + '/config').then(r => r.json()).then(d => { OPENAI_KEY = d.openaiKey; }).catch(() => {});
 const statusEl = document.getElementById('status');
 const errorEl  = document.getElementById('errorBanner');
 const debugEl  = document.getElementById('debug');

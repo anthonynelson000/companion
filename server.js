@@ -187,6 +187,11 @@ function getMusicQuery(text) {
   return 'Russian classical music opera Tchaikovsky Rachmaninoff';
 }
 
+// ── Config endpoint ───────────────────────────────────────────────
+app.get('/config', (req, res) => {
+  res.json({ openaiKey: process.env.OPENAI_API_KEY || '' });
+});
+
 app.post('/chat', async (req, res) => {
   const { message, model = 'chat' } = req.body;
   if (!message) return res.status(400).json({ error: 'No message' });
