@@ -53,11 +53,14 @@
     background: rgba(180,60,60,0.85); color: #fff; padding: 14px 28px; border-radius: 10px;
     font-size: 1.1rem; text-align: center; max-width: 320px; }
   .mic-btn { margin-top: 40px; width: 160px; height: 160px; border-radius: 50%;
-    border: 2px solid rgba(201,169,110,0.5); background: rgba(201,169,110,0.06);
+    border: 3px solid #444; background: rgba(255,255,255,0.03);
     display: flex; align-items: center; justify-content: center; cursor: pointer;
     transition: border-color 0.3s, background 0.3s; -webkit-tap-highlight-color: transparent; }
   .mic-icon { width: 64px; height: 64px; }
-  .mic-icon path { fill: rgba(201,169,110,0.7); }
+  .mic-icon path { fill: #444; }
+  .mic-btn:not(.disabled) .mic-icon path { fill: #4caf50; }
+  .mic-btn.listening .mic-icon path { fill: #e53935; }
+  .mic-btn.disabled .mic-icon path { fill: #444; }
 </style>
 </head>
 <body class="idle">
@@ -261,6 +264,7 @@ function speak(audioB64) {
 // ── Greeting ─────────────────────────────────────────────────────
 async function greet() {
   setStatus('thinking');
+  hideMic();
   try {
     const res  = await fetch(SERVER + '/chat', {
       method: 'POST',
