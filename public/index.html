@@ -69,7 +69,7 @@
   <div class="bar"></div>
 </div>
 <div class="status" id="status"></div>
-<button id="micBtn" class="mic-btn disabled" onclick="onMicTap()">
+<button id="micBtn" class="mic-btn disabled">
   <svg class="mic-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M16 3C14.3 3 13 4.3 13 6v10c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z"/>
     <path d="M8 14c0 4.4 3.6 8 8 8s8-3.6 8-8" stroke-width="2" stroke-linecap="round" fill="none"/>
@@ -101,8 +101,8 @@ function showError(msg) {
 }
 
 // ── The only two functions that touch the mic button ─────────────
-function showMic()  { micBtn.classList.remove('disabled','listening'); micBtn.disabled = false; log('mic btn: GREEN'); }
-function hideMic()  { micBtn.classList.remove('listening'); micBtn.classList.add('disabled'); micBtn.disabled = true; log('mic btn: GREY'); }
+function showMic()  { micBtn.classList.remove('disabled','listening'); micBtn.disabled = false; log('mic btn: GREEN (ready)'); }
+function hideMic()  { micBtn.classList.remove('listening'); micBtn.classList.add('disabled'); micBtn.disabled = false; log('mic btn: GREY (disabled)'); }
 
 // ── Visual state (never touches mic button) ──────────────────────
 function setStatus(state) {
@@ -121,11 +121,18 @@ function unlockAudio() {
   log('audio element created and unlocked');
 }
 
-// ── Mic tap handler ──────────────────────────────────────────────
-function onMicTap() {
+// ── Mic button event listeners ──────────────────────────────────
+micBtn.addEventListener('click', () => {
+  if (micBtn.classList.contains('disabled')) { log('mic blocked — disabled'); return; }
   log('mic tapped');
-  hideMic();
-  setTimeout(startListening, 800);
+  micBtn.classList.add('listening');
+  hideMicInteraction();
+  setTimeout(startListening, 300);
+});
+
+function hideMicInteraction() {
+  micBtn.disabled = true;
+  log('mic interaction started');
 }
 
 // ── Speech recognition ───────────────────────────────────────────
@@ -151,7 +158,9 @@ function startListening() {
   let gotResult = false;
   rec.onstart = () => {
     setStatus('listening');
-    log('listening…');
+    micBtn.classList.add('listening');
+    micBtn.classList.remove('disabled');
+    log('listening… RED');
     silenceTimer = setTimeout(() => {
       log('silence timeout — forcing stop');
       try { rec.stop(); } catch(e) {}
