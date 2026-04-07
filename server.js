@@ -300,6 +300,111 @@ app.post('/chat', async (req, res) => {
   }
 });
 
+// ── Streaming chat endpoint ──────────────────────────────────────
+app.post('/chat-stream', async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: 'No message' });
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  const send = (data) => res.write(`data: ${JSON.stringify(data)}
+
+`);
+
+  try {
+    const history = await loadHistory();
+    await saveMessage('user', message);
+    history.push({ role: 'user', content: message });
+
+    // Music intercept
+    if (detectMusicRequest(message)) {
+      const query = getMusicQuery(message);
+      const reply = `Конечно, Фаина! Сейчас включу. [MUSIC: ${query}]`;
+      await saveMessage('assistant', reply);
+      const spokenReply = reply.replace(/\[MUSIC:[^\]]*\]/g, '').trim();
+      send({ music: query });
+      const audioBuffer = await elevenLabsTTS(spokenReply);
+      send({ audio: audioBuffer.toString('base64') });
+      send({ done: true });
+      return res.end();
+    }
+
+    const detailKeywords = ['расскажи подробно', 'расскажи больше', 'подробнее', 'расскажи всё', 'хочу знать больше', 'объясни', 'расскажи про', 'прочитай', 'читай', 'книгу', 'стихи', 'поэму', 'историю'];
+    const wantsDetail = detailKeywords.some(kw => message.toLowerCase().includes(kw));
+    const maxTok = wantsDetail ? 400 : 120;
+
+    const stories = await loadStories();
+
+    // Stream Claude response
+    let fullReply = '';
+    const stream = client.messages.stream({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: maxTok,
+      system: SYSTEM_PROMPT + stories,
+      messages: history
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta?.type === 'text_delta') {
+        fullReply += chunk.delta.text;
+      }
+    }
+
+    if (!fullReply) { send({ done: true }); return res.end(); }
+
+    await saveMessage('assistant', fullReply);
+
+    // Story detection (fire and forget)
+    const storyKeywords = ['помню', 'когда я была', 'в детстве', 'в молодости', 'мой муж', 'моя семья',
+      'мои дети', 'работала', 'жила', 'мы жили', 'была война', 'в советское', 'тогда было', 'раньше'];
+    const lastUserMsg = history[history.length - 1]?.content || '';
+    const looksLikeStory = storyKeywords.some(kw => lastUserMsg.toLowerCase().includes(kw)) && lastUserMsg.length > 80;
+    if (looksLikeStory) {
+      client.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 100,
+        messages: [{ role: 'user', content: `Summarize this personal memory from Faina in one short Russian sentence (max 20 words): "${lastUserMsg}"` }]
+      }).then(r => {
+        const summary = r.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+        if (summary) saveStory(summary);
+      }).catch(() => {});
+    }
+
+    // Filter reply
+    const BANNED_TOPICS = ['new york times', 'nyt', 'metropolitan', 'согласно', 'исследования показывают', 'эксперты говорят', 'важно отметить', 'вам следует', 'я рекомендую', 'я предлагаю'];
+    const sentences = fullReply.split(/(?<=[.!?])\s+/);
+    const filtered = sentences.filter(s => !BANNED_TOPICS.some(t => s.toLowerCase().includes(t)));
+    let filteredReply = filtered.length > 0 ? filtered.join(' ') : fullReply;
+    const lastPunct = Math.max(filteredReply.lastIndexOf('.'), filteredReply.lastIndexOf('!'), filteredReply.lastIndexOf('?'));
+    if (lastPunct > 0 && lastPunct < filteredReply.length - 1) filteredReply = filteredReply.substring(0, lastPunct + 1);
+
+    // Music tag
+    const musicMatch = filteredReply.match(/\[MUSIC:\s*([^\]]+)\]/);
+    if (musicMatch) send({ music: musicMatch[1].trim() });
+
+    const spokenReply = filteredReply.replace(/\[MUSIC:[^\]]*\]/g, '').trim();
+
+    // Generate and stream ElevenLabs audio in sentence chunks
+    const sentenceChunks = spokenReply.match(/[^.!?]+[.!?]+/g) || [spokenReply];
+    for (const chunk of sentenceChunks) {
+      if (chunk.trim().length < 2) continue;
+      try {
+        const audioBuffer = await elevenLabsTTS(chunk.trim());
+        send({ audio: audioBuffer.toString('base64') });
+      } catch(e) { console.error('TTS chunk error:', e); }
+    }
+
+    send({ done: true });
+    res.end();
+
+  } catch(err) {
+    console.error('chat-stream error:', err);
+    send({ error: err.message });
+    res.end();
+  }
+});
+
 app.post('/clear', async (req, res) => {
   if (pgPool) {
     await pgPool.query('DELETE FROM messages').catch(console.error);
